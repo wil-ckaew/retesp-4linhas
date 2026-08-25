@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+/* Scrollbar personalizada para dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #161B22;
+}
+::-webkit-scrollbar-thumb {
+  background: #30363D;
+  border-radius: 4px;
+}

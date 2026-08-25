@@ -1,0 +1,11 @@
+// Substituir a parte do story RETESP no componente StoriesComponent
+// Procurar por:
+// <View style={styles.storyRETESP}>
+//   <Text style={styles.storyRETESPText}>R4</Text>
+//   <View style={styles.storyRETESPBadge}>
+//     <Text style={styles.storyRETESPBadgeText}>4L</Text>
+//   </View>
+// </View>
+
+// Substituir por:
+// <StatusLogo size={56} showText={false} />

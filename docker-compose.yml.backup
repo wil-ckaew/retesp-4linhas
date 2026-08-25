@@ -1,0 +1,160 @@
+services:
+  db:
+    image: postgres:16
+    container_name: retesp-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  minio:
+    image: minio/minio:latest
+    container_name: retesp-minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./minio_data:/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: retesp-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: retesp-ollama
+    restart: always
+    volumes:
+      - ./ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    command: serve
+
+  video_ai:
+    build: ./video_ai
+    container_name: retesp-video-ai
+    restart: always
+    depends_on:
+      - redis
+      - minio
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+    ports:
+      - "8001:8001"
+
+  ai_service:
+    build: ./ai_service
+    container_name: retesp-ai
+    restart: always
+    depends_on:
+      - ollama
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - DATABASE_URL=${DATABASE_URL}
+
+  social_service:
+    build: ./social_service
+    container_name: retesp-social
+    restart: always
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+
+  notification_worker:
+    build: ./notification_worker
+    container_name: retesp-notify
+    restart: always
+    depends_on:
+      - redis
+      - db
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+
+  reports_service:
+    build: ./reports_service
+    container_name: retesp-reports
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+
+  coin_engine:
+    build: ./coin_engine
+    container_name: retesp-coins
+    restart: always
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+
+  backend:
+    build: ./backend
+    container_name: retesp-backend
+    restart: always
+    depends_on:
+      - db
+      - minio
+      - redis
+      - ai_service
+      - video_ai
+      - social_service
+      - notification_worker
+      - reports_service
+      - coin_engine
+    env_file:
+      - .env
+    ports:
+      - "8081:8080"
+    # CORREÇÃO: MONTAR A PASTA UPLOADS LOCALMENTE
+    volumes:
+      - ./uploads:/uploads
+
+  frontend:
+    build: ./frontend
+    container_name: retesp-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "3001:3000"
+
+volumes:
+  postgres_data:
+
+volumes:
+  postgres_data:
+    driver: local

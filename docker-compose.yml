@@ -1,0 +1,187 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16
+    container_name: retesp-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-retesp}
+      POSTGRES_USER: ${POSTGRES_USER:-retesp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-retesp123}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - retesp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retesp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: retesp-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - retesp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    container_name: retesp-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password123}
+    volumes:
+      - minio_data:/data
+    networks:
+      - retesp-network
+
+  ollama:
+    image: ollama/ollama:0.5.7
+    container_name: retesp-ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - retesp-network
+
+  backend:
+    build: ./backend
+    container_name: retesp-backend
+    restart: always
+    ports:
+      - "8081:8080"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-retesp}:${POSTGRES_PASSWORD:-retesp123}@db:5432/${POSTGRES_DB:-retesp}
+      JWT_SECRET: ${JWT_SECRET:-secret}
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      ollama:
+        condition: service_started
+    networks:
+      - retesp-network
+
+  frontend:
+    build: ./frontend
+    container_name: retesp-frontend
+    restart: always
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    networks:
+      - retesp-network
+
+  social_service:
+    build: ./social_service
+    container_name: retesp-social
+    restart: always
+    ports:
+      - "8082:8080"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-retesp}:${POSTGRES_PASSWORD:-retesp123}@db:5432/${POSTGRES_DB:-retesp}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - retesp-network
+
+  reports_service:
+    build: ./reports_service
+    container_name: retesp-reports
+    restart: always
+    ports:
+      - "8083:8080"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-retesp}:${POSTGRES_PASSWORD:-retesp123}@db:5432/${POSTGRES_DB:-retesp}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - retesp-network
+
+  notification_worker:
+    build: ./notification_worker
+    container_name: retesp-notify
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-retesp}:${POSTGRES_PASSWORD:-retesp123}@db:5432/${POSTGRES_DB:-retesp}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - retesp-network
+
+  coin_engine:
+    build: ./coin_engine
+    container_name: retesp-coins
+    restart: always
+    ports:
+      - "8084:8080"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-retesp}:${POSTGRES_PASSWORD:-retesp123}@db:5432/${POSTGRES_DB:-retesp}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - retesp-network
+
+  ai_service:
+    build: ./ai_service
+    container_name: retesp-ai
+    restart: always
+    ports:
+      - "8085:8080"
+    environment:
+      OLLAMA_URL: http://ollama:11434
+    depends_on:
+      - ollama
+    networks:
+      - retesp-network
+
+  video_ai:
+    build: ./video_ai
+    container_name: retesp-video-ai
+    restart: always
+    ports:
+      - "8086:8080"
+    depends_on:
+      - ollama
+      - minio
+    networks:
+      - retesp-network
+
+networks:
+  retesp-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  minio_data:
+  ollama_data:

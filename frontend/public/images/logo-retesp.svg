@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <defs>
+    <style>
+      .retesp { font-family: 'Arial', sans-serif; font-weight: 900; font-size: 32px; fill: #EF4444; }
+      .quatro { font-family: 'Arial', sans-serif; font-weight: 900; font-size: 32px; fill: #10B981; }
+      .linhas { font-family: 'Arial', sans-serif; font-weight: 700; font-size: 12px; fill: #10B981; }
+    </style>
+  </defs>
+  
+  <!-- Ícone de 4 linhas -->
+  <g transform="translate(0, 5)">
+    <rect x="0" y="0" width="8" height="40" rx="2" fill="#10B981" opacity="0.9"/>
+    <rect x="12" y="8" width="8" height="32" rx="2" fill="#10B981" opacity="0.7"/>
+    <rect x="24" y="4" width="8" height="36" rx="2" fill="#10B981" opacity="0.8"/>
+    <rect x="36" y="12" width="8" height="28" rx="2" fill="#10B981" opacity="0.6"/>
+  </g>
+  
+  <text x="55" y="38" class="retesp">RETESP</text>
+  <text x="155" y="38" class="quatro">4L</text>
+  <text x="120" y="52" class="linhas">4 Linhas</text>
+</svg>

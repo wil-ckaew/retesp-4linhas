@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+ultralytics
+opencv-python
+redis
+boto3
+minio
+python-multipart

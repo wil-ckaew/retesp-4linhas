@@ -1,0 +1,72 @@
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
+import Icon from 'react-native-vector-icons/Ionicons';
+
+// Importar screens
+import HomeScreen from '../screens/HomeScreen';
+import SocialScreen from '../screens/SocialScreen';
+import TrainingsScreen from '../screens/TrainingsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import AthletesScreen from '../screens/AthletesScreen';
+import AttendanceScreen from '../screens/AttendanceScreen';
+
+const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
+
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName = '';
+          if (route.name === 'Início') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Social') {
+            iconName = focused ? 'people' : 'people-outline';
+          } else if (route.name === 'Treinos') {
+            iconName = focused ? 'fitness' : 'fitness-outline';
+          } else if (route.name === 'Atletas') {
+            iconName = focused ? 'people-circle' : 'people-circle-outline';
+          } else if (route.name === 'Perfil') {
+            iconName = focused ? 'person' : 'person-outline';
+          }
+          return <Icon name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#3B82F6',
+        tabBarInactiveTintColor: '#6B7280',
+        tabBarStyle: {
+          backgroundColor: '#161B22',
+          borderTopColor: '#30363D',
+          paddingBottom: 8,
+          paddingTop: 8,
+          height: 60,
+        },
+        headerStyle: {
+          backgroundColor: '#0D1117',
+          borderBottomColor: '#30363D',
+          borderBottomWidth: 1,
+        },
+        headerTitleStyle: {
+          color: '#FFFFFF',
+        },
+        headerTintColor: '#FFFFFF',
+      })}
+    >
+      <Tab.Screen name="Início" component={HomeScreen} />
+      <Tab.Screen name="Treinos" component={TrainingsScreen} />
+      <Tab.Screen name="Atletas" component={AthletesScreen} />
+      <Tab.Screen name="Social" component={SocialScreen} />
+      <Tab.Screen name="Perfil" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+}
+
+export default function AppNavigator() {
+  return (
+    <NavigationContainer>
+      <MainTabs />
+    </NavigationContainer>
+  );
+}

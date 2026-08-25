@@ -1,0 +1,1098 @@
+// backend/src/main.rs
+use actix_web::{web, App, HttpServer, HttpResponse, Responder, middleware::Logger};
+use actix_cors::Cors;
+use actix_files::Files;
+use actix_multipart::Multipart;
+use serde::{Deserialize, Serialize};
+use sqlx::{PgPool, postgres::PgPoolOptions};
+use std::env;
+use chrono::{NaiveDate, Local, Duration};
+use jsonwebtoken::{encode, Header, EncodingKey};
+use std::time::{SystemTime, UNIX_EPOCH};
+use bcrypt::verify;
+use reqwest::Client as ReqwestClient;
+use futures_util::TryStreamExt;
+use std::fs;
+use std::path::Path;
+use uuid::Uuid;
+use std::collections::HashMap;
+
+mod migrations;
+
+// --- MODELOS ---
+#[derive(Debug, Serialize, Deserialize)] 
+struct Claims { sub: String, role: String, exp: usize }
+
+#[derive(Deserialize)] 
+struct LoginRequest { email: String, password: String }
+
+#[derive(Serialize)] 
+struct LoginResponse { token: String, role: String, name: String }
+
+#[derive(Deserialize, Serialize)] 
+struct CreateAthleteRequest { 
+    name: String, 
+    birth_date: String, 
+    category: String, 
+    avatar_url: Option<String>,
+    medical_form_url: Option<String>
+}
+
+#[derive(Serialize)] 
+struct AthleteResponse { 
+    id: String, 
+    name: String, 
+    birth_date: String, 
+    category: String, 
+    avatar_url: Option<String>,
+    medical_form_url: Option<String>
+}
+
+#[derive(Deserialize)] 
+struct CreateTeamRequest { name: String, category: String }
+
+#[derive(Serialize)] 
+struct TeamResponse { id: String, name: String, category: String }
+
+#[derive(Deserialize, Serialize)] 
+struct CreateCoachRequest { name: String, email: String, specialization: Option<String> }
+
+#[derive(Serialize)] 
+struct CoachResponse { id: String, name: String, email: String, specialization: Option<String> }
+
+#[derive(Deserialize)] 
+struct AITrainingRequest { category: String, duration: String, objective: String }
+
+#[derive(Deserialize)] 
+struct AttendanceRequest { 
+    athlete_id: Uuid, 
+    training_date: Option<String>,
+    present: bool 
+}
+
+#[derive(Serialize)] 
+struct AttendanceStatusResponse { 
+    athlete_id: String, 
+    name: String, 
+    avatar_url: Option<String>, 
+    present: bool 
+}
+
+#[derive(Serialize)] 
+struct AthleteSummaryResponse {
+    id: String,
+    name: String,
+    category: String,
+    avatar_url: Option<String>,
+    frequency: f64,
+    evolution: String,
+}
+
+#[derive(Serialize)] 
+struct MediaResponse {
+    id: String,
+    file_url: String,
+    media_type: String,
+    uploaded_at: String,
+    athlete_name: String,
+}
+
+#[derive(Deserialize)]
+struct CreatePostRequest {
+    team_name: String,
+    content: String,
+    image_url: Option<String>,
+    video_url: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+struct SocialPost {
+    id: String,
+    author_name: String,
+    team_name: String,
+    content: String,
+    image_url: Option<String>,
+    video_url: Option<String>,
+    created_at: String,
+    likes: i64,
+    comments: i64,
+}
+
+#[derive(Deserialize)]
+struct RenameMediaRequest {
+    new_name: String,
+}
+
+// --- HELPERS ---
+fn get_jwt_secret() -> String { 
+    env::var("JWT_SECRET").expect("JWT_SECRET must be set") 
+}
+
+fn get_ollama_url() -> String { 
+    "http://ollama:11434".to_string() 
+}
+
+fn generate_token(user_id: &str, role: &str) -> String {
+    let secret = get_jwt_secret();
+    let start = SystemTime::now();
+    let since_epoch = start.duration_since(UNIX_EPOCH).unwrap();
+    let exp = since_epoch.as_secs() as usize + 3600 * 24;
+    let claims = Claims { 
+        sub: user_id.to_string(), 
+        role: role.to_string(), 
+        exp 
+    };
+    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes())).unwrap()
+}
+
+// --- HANDLERS ---
+async fn login(req: web::Json<LoginRequest>, pool: web::Data<PgPool>) -> impl Responder {
+    let row = sqlx::query_as::<_, (Uuid, String, String, String)>(
+        "SELECT id, name, password_hash, role FROM users WHERE email = $1"
+    )
+    .bind(&req.email)
+    .fetch_optional(&**pool)
+    .await;
+    
+    match row {
+        Ok(Some((id, name, password_hash, role))) => {
+            if verify(&req.password, &password_hash).unwrap_or(false) {
+                let token = generate_token(&id.to_string(), &role);
+                HttpResponse::Ok().json(LoginResponse { token, role, name })
+            } else {
+                HttpResponse::Unauthorized().body("Credenciais inválidas")
+            }
+        }
+        Ok(None) => HttpResponse::Unauthorized().body("Credenciais inválidas"),
+        Err(e) => {
+            eprintln!("Erro ao buscar usuário: {}", e);
+            HttpResponse::InternalServerError().body("Erro interno")
+        }
+    }
+}
+
+// ATLETAS
+async fn list_athletes(pool: web::Data<PgPool>) -> impl Responder {
+    let rows = sqlx::query_as::<_, (Uuid, String, String, String, Option<String>, Option<String>)>(
+        "SELECT id, name, birth_date::text, category, avatar_url, medical_form_url FROM athletes ORDER BY created_at DESC"
+    )
+    .fetch_all(&**pool)
+    .await;
+    
+    match rows {
+        Ok(rows) => {
+            let athletes: Vec<AthleteResponse> = rows.iter().map(|r| AthleteResponse {
+                id: r.0.to_string(), 
+                name: r.1.clone(), 
+                birth_date: r.2.clone(), 
+                category: r.3.clone(), 
+                avatar_url: r.4.clone(),
+                medical_form_url: r.5.clone()
+            }).collect();
+            HttpResponse::Ok().json(athletes)
+        }
+        Err(e) => {
+            eprintln!("Erro ao buscar atletas: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar atletas")
+        }
+    }
+}
+
+async fn create_athlete(req: web::Json<CreateAthleteRequest>, pool: web::Data<PgPool>) -> impl Responder {
+    if req.name.trim().is_empty() { 
+        return HttpResponse::BadRequest().body("Nome obrigatório.") 
+    }
+    if req.category.trim().is_empty() { 
+        return HttpResponse::BadRequest().body("Categoria obrigatória.") 
+    }
+    if NaiveDate::parse_from_str(&req.birth_date, "%Y-%m-%d").is_err() {
+        return HttpResponse::BadRequest().body("Formato de data inválido. Use YYYY-MM-DD.");
+    }
+    
+    match sqlx::query(
+        "INSERT INTO athletes (name, birth_date, category, avatar_url, medical_form_url) VALUES ($1, $2::date, $3, $4, $5)"
+    )
+    .bind(&req.name)
+    .bind(&req.birth_date)
+    .bind(&req.category)
+    .bind(&req.avatar_url)
+    .bind(&req.medical_form_url)
+    .execute(&**pool).await {
+        Ok(_) => HttpResponse::Ok().json("Atleta cadastrado com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao inserir atleta: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+async fn get_athlete(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    let row = sqlx::query_as::<_, (Uuid, String, String, String, Option<String>, Option<String>)>(
+        "SELECT id, name, birth_date::text, category, avatar_url, medical_form_url FROM athletes WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&**pool)
+    .await;
+    
+    match row {
+        Ok(Some(r)) => HttpResponse::Ok().json(AthleteResponse {
+            id: r.0.to_string(), 
+            name: r.1.clone(), 
+            birth_date: r.2.clone(), 
+            category: r.3.clone(), 
+            avatar_url: r.4.clone(),
+            medical_form_url: r.5.clone()
+        }),
+        Ok(None) => HttpResponse::NotFound().body("Atleta não encontrado"),
+        Err(e) => {
+            eprintln!("Erro ao buscar atleta: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar atleta")
+        }
+    }
+}
+
+async fn update_athlete(path: web::Path<Uuid>, req: web::Json<CreateAthleteRequest>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    if req.name.trim().is_empty() { 
+        return HttpResponse::BadRequest().body("Nome obrigatório.") 
+    }
+    if req.category.trim().is_empty() { 
+        return HttpResponse::BadRequest().body("Categoria obrigatória.") 
+    }
+    if NaiveDate::parse_from_str(&req.birth_date, "%Y-%m-%d").is_err() {
+        return HttpResponse::BadRequest().body("Formato de data inválido.");
+    }
+    
+    match sqlx::query(
+        "UPDATE athletes SET name = $1, birth_date = $2::date, category = $3, avatar_url = $4, medical_form_url = $5 WHERE id = $6"
+    )
+    .bind(&req.name)
+    .bind(&req.birth_date)
+    .bind(&req.category)
+    .bind(&req.avatar_url)
+    .bind(&req.medical_form_url)
+    .bind(id)
+    .execute(&**pool).await {
+        Ok(_) => HttpResponse::Ok().json("Atleta atualizado com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao atualizar atleta: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+async fn delete_athlete(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    match sqlx::query("DELETE FROM media WHERE athlete_id = $1").bind(id).execute(&**pool).await {
+        Ok(_) => {
+            match sqlx::query("DELETE FROM athletes WHERE id = $1").bind(id).execute(&**pool).await {
+                Ok(_) => HttpResponse::Ok().json("Atleta excluído com sucesso!"),
+                Err(e) => {
+                    eprintln!("Erro ao excluir atleta: {}", e);
+                    HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+                }
+            }
+        },
+        Err(e) => {
+            eprintln!("Erro ao excluir mídias: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+// PROFESSORES
+async fn list_coaches(pool: web::Data<PgPool>) -> impl Responder {
+    let rows = sqlx::query_as::<_, (Uuid, String, String, Option<String>)>(
+        "SELECT id, name, email, specialization FROM coaches ORDER BY created_at DESC"
+    )
+    .fetch_all(&**pool)
+    .await;
+    
+    match rows {
+        Ok(rows) => {
+            let coaches: Vec<CoachResponse> = rows.iter().map(|r| CoachResponse {
+                id: r.0.to_string(), 
+                name: r.1.clone(), 
+                email: r.2.clone(), 
+                specialization: r.3.clone()
+            }).collect();
+            HttpResponse::Ok().json(coaches)
+        }
+        Err(e) => {
+            eprintln!("Erro ao buscar coaches: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar coaches")
+        }
+    }
+}
+
+async fn create_coach(req: web::Json<CreateCoachRequest>, pool: web::Data<PgPool>) -> impl Responder {
+    if req.name.trim().is_empty() { 
+        return HttpResponse::BadRequest().body("Nome obrigatório.") 
+    }
+    if req.email.trim().is_empty() { 
+        return HttpResponse::BadRequest().body("Email obrigatório.") 
+    }
+    
+    match sqlx::query(
+        "INSERT INTO coaches (name, email, specialization) VALUES ($1, $2, $3)"
+    )
+    .bind(&req.name)
+    .bind(&req.email)
+    .bind(&req.specialization)
+    .execute(&**pool).await {
+        Ok(_) => HttpResponse::Ok().json("Professor cadastrado com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao inserir coach: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+async fn get_coach(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    let row = sqlx::query_as::<_, (Uuid, String, String, Option<String>)>(
+        "SELECT id, name, email, specialization FROM coaches WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&**pool)
+    .await;
+    
+    match row {
+        Ok(Some(r)) => HttpResponse::Ok().json(CoachResponse {
+            id: r.0.to_string(), 
+            name: r.1.clone(), 
+            email: r.2.clone(), 
+            specialization: r.3.clone()
+        }),
+        Ok(None) => HttpResponse::NotFound().body("Professor não encontrado"),
+        Err(e) => {
+            eprintln!("Erro ao buscar coach: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar coach")
+        }
+    }
+}
+
+async fn update_coach(path: web::Path<Uuid>, req: web::Json<CreateCoachRequest>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    if req.name.trim().is_empty() { 
+        return HttpResponse::BadRequest().body("Nome obrigatório.") 
+    }
+    if req.email.trim().is_empty() { 
+        return HttpResponse::BadRequest().body("Email obrigatório.") 
+    }
+    
+    match sqlx::query(
+        "UPDATE coaches SET name = $1, email = $2, specialization = $3 WHERE id = $4"
+    )
+    .bind(&req.name)
+    .bind(&req.email)
+    .bind(&req.specialization)
+    .bind(id)
+    .execute(&**pool).await {
+        Ok(_) => HttpResponse::Ok().json("Professor atualizado com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao atualizar coach: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+async fn delete_coach(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    match sqlx::query("DELETE FROM coaches WHERE id = $1").bind(id).execute(&**pool).await {
+        Ok(_) => HttpResponse::Ok().json("Professor excluído com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao excluir coach: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+// TURMAS
+async fn list_teams(pool: web::Data<PgPool>) -> impl Responder {
+    let rows = sqlx::query_as::<_, (Uuid, String, String)>(
+        "SELECT id, name, category FROM teams ORDER BY created_at DESC"
+    )
+    .fetch_all(&**pool)
+    .await;
+    
+    match rows {
+        Ok(rows) => {
+            let teams: Vec<TeamResponse> = rows.iter().map(|r| TeamResponse {
+                id: r.0.to_string(), 
+                name: r.1.clone(), 
+                category: r.2.clone()
+            }).collect();
+            HttpResponse::Ok().json(teams)
+        }
+        Err(e) => {
+            eprintln!("Erro ao buscar turmas: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar turmas")
+        }
+    }
+}
+
+async fn create_team(req: web::Json<CreateTeamRequest>, pool: web::Data<PgPool>) -> impl Responder {
+    if req.name.trim().is_empty() { 
+        return HttpResponse::BadRequest().body("Nome obrigatório.") 
+    }
+    
+    match sqlx::query("INSERT INTO teams (name, category) VALUES ($1, $2)")
+    .bind(&req.name)
+    .bind(&req.category)
+    .execute(&**pool).await {
+        Ok(_) => HttpResponse::Ok().json("Turma criada com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao criar turma: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+async fn get_team(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    let row = sqlx::query_as::<_, (Uuid, String, String)>(
+        "SELECT id, name, category FROM teams WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&**pool)
+    .await;
+    
+    match row {
+        Ok(Some(r)) => HttpResponse::Ok().json(TeamResponse {
+            id: r.0.to_string(), 
+            name: r.1.clone(), 
+            category: r.2.clone()
+        }),
+        Ok(None) => HttpResponse::NotFound().body("Turma não encontrada"),
+        Err(e) => {
+            eprintln!("Erro ao buscar turma: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar turma")
+        }
+    }
+}
+
+async fn update_team(path: web::Path<Uuid>, req: web::Json<CreateTeamRequest>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    if req.name.trim().is_empty() { 
+        return HttpResponse::BadRequest().body("Nome obrigatório.") 
+    }
+    
+    match sqlx::query("UPDATE teams SET name = $1, category = $2 WHERE id = $3")
+    .bind(&req.name)
+    .bind(&req.category)
+    .bind(id)
+    .execute(&**pool).await {
+        Ok(_) => HttpResponse::Ok().json("Turma atualizada com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao atualizar turma: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+async fn delete_team(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    match sqlx::query("DELETE FROM teams WHERE id = $1").bind(id).execute(&**pool).await {
+        Ok(_) => HttpResponse::Ok().json("Turma excluída com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao excluir turma: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+// --- CHAMADA ---
+async fn list_attendance_by_team(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let _team_id = path.into_inner();
+    let today = Local::now().date_naive();
+    
+    let rows = sqlx::query_as::<_, (Uuid, String, Option<String>, Option<bool>)>(
+        r#"
+        SELECT 
+            a.id, 
+            a.name, 
+            a.avatar_url, 
+            (SELECT present FROM attendance att WHERE att.athlete_id = a.id AND att.training_date = $1) as present
+        FROM athletes a
+        ORDER BY a.name ASC
+        "#
+    )
+    .bind(today)
+    .fetch_all(&**pool)
+    .await;
+    
+    match rows {
+        Ok(rows) => {
+            let attendance_list: Vec<AttendanceStatusResponse> = rows.iter().map(|r| AttendanceStatusResponse {
+                athlete_id: r.0.to_string(), 
+                name: r.1.clone(), 
+                avatar_url: r.2.clone(), 
+                present: r.3.unwrap_or(false)
+            }).collect();
+            HttpResponse::Ok().json(attendance_list)
+        }
+        Err(e) => {
+            eprintln!("Erro ao buscar chamada: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar chamada")
+        }
+    }
+}
+
+async fn register_attendance(req: web::Json<AttendanceRequest>, pool: web::Data<PgPool>) -> impl Responder {
+    let training_date = match &req.training_date {
+        Some(date) => NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap_or_else(|_| Local::now().date_naive()),
+        None => Local::now().date_naive()
+    };
+    
+    match sqlx::query(
+        r#"
+        INSERT INTO attendance (athlete_id, training_date, present) 
+        VALUES ($1, $2, $3)
+        ON CONFLICT (athlete_id, training_date) 
+        DO UPDATE SET present = $3
+        "#
+    )
+    .bind(req.athlete_id)
+    .bind(training_date)
+    .bind(req.present)
+    .execute(&**pool)
+    .await {
+        Ok(_) => HttpResponse::Ok().json("Presença registrada com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao registrar presença: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+async fn get_attendance_by_date(query: web::Query<HashMap<String, String>>, pool: web::Data<PgPool>) -> impl Responder {
+    let date_str = query.get("date").cloned().unwrap_or_else(|| Local::now().date_naive().to_string());
+    let date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").unwrap_or_else(|_| Local::now().date_naive());
+    
+    let rows = sqlx::query_as::<_, (Uuid, bool)>(
+        "SELECT athlete_id, present FROM attendance WHERE training_date = $1"
+    )
+    .bind(date)
+    .fetch_all(&**pool)
+    .await;
+    
+    match rows {
+        Ok(rows) => {
+            let result: Vec<serde_json::Value> = rows.iter().map(|r| {
+                serde_json::json!({
+                    "athlete_id": r.0.to_string(),
+                    "present": r.1
+                })
+            }).collect();
+            HttpResponse::Ok().json(result)
+        }
+        Err(e) => {
+            eprintln!("Erro ao buscar chamada por data: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar chamada")
+        }
+    }
+}
+
+async fn get_athlete_attendance(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let athlete_id = path.into_inner();
+    
+    let rows = sqlx::query_as::<_, (String, bool)>(
+        "SELECT training_date::text, present FROM attendance WHERE athlete_id = $1 ORDER BY training_date DESC"
+    )
+    .bind(athlete_id)
+    .fetch_all(&**pool)
+    .await;
+    
+    match rows {
+        Ok(rows) => {
+            let result: Vec<serde_json::Value> = rows.iter().map(|r| {
+                serde_json::json!({
+                    "date": r.0,
+                    "present": r.1
+                })
+            }).collect();
+            HttpResponse::Ok().json(result)
+        }
+        Err(e) => {
+            eprintln!("Erro ao buscar presenças do atleta: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar presenças")
+        }
+    }
+}
+
+// --- PORTAL DOS PAIS ---
+async fn get_athlete_summary(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let athlete_id = path.into_inner();
+    let today = Local::now().date_naive();
+    let thirty_days_ago = today - Duration::days(30);
+
+    let athlete_row = sqlx::query_as::<_, (String, String, Option<String>)>(
+        "SELECT name, category, avatar_url FROM athletes WHERE id = $1"
+    )
+    .bind(athlete_id)
+    .fetch_optional(&**pool)
+    .await;
+
+    let (name, category, avatar_url) = match athlete_row {
+        Ok(Some(r)) => (r.0, r.1, r.2),
+        Ok(None) => return HttpResponse::NotFound().body("Atleta não encontrado"),
+        Err(e) => {
+            eprintln!("Erro ao buscar atleta: {}", e);
+            return HttpResponse::InternalServerError().body("Erro ao buscar atleta");
+        }
+    };
+
+    let freq_row = sqlx::query_as::<_, (i64, i64)>(
+        r#"
+        SELECT 
+            COUNT(*)::bigint as total,
+            COALESCE(SUM(CASE WHEN present THEN 1 ELSE 0 END), 0)::bigint as present
+        FROM attendance 
+        WHERE athlete_id = $1 AND training_date >= $2 AND training_date <= $3
+        "#
+    )
+    .bind(athlete_id)
+    .bind(thirty_days_ago)
+    .bind(today)
+    .fetch_one(&**pool)
+    .await;
+
+    let frequency = match freq_row {
+        Ok((total, present)) => {
+            if total > 0 { (present as f64 / total as f64) * 100.0 } else { 0.0 }
+        },
+        Err(_) => 0.0
+    };
+
+    let evolution = if frequency >= 90.0 { "Ouro 🚀" } 
+        else if frequency >= 75.0 { "Prata" } 
+        else if frequency >= 50.0 { "Bronze" } 
+        else { "Atenção" };
+
+    let response = AthleteSummaryResponse {
+        id: athlete_id.to_string(),
+        name,
+        category,
+        avatar_url,
+        frequency,
+        evolution: evolution.to_string(),
+    };
+    HttpResponse::Ok().json(response)
+}
+
+async fn list_media_by_athlete(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let athlete_id = path.into_inner();
+    let rows = sqlx::query_as::<_, (Uuid, String, String, String)>(
+        "SELECT id, file_url, type, uploaded_at::text FROM media WHERE athlete_id = $1 ORDER BY uploaded_at DESC"
+    )
+    .bind(athlete_id)
+    .fetch_all(&**pool)
+    .await;
+    
+    match rows {
+        Ok(rows) => {
+            let media_list: Vec<MediaResponse> = rows.iter().map(|r| MediaResponse {
+                id: r.0.to_string(), 
+                file_url: r.1.clone(), 
+                media_type: r.2.clone(), 
+                uploaded_at: r.3.clone(),
+                athlete_name: "".to_string()
+            }).collect();
+            HttpResponse::Ok().json(media_list)
+        }
+        Err(e) => {
+            eprintln!("Erro ao buscar mídias: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar mídias")
+        }
+    }
+}
+
+// LISTAR TODOS OS VÍDEOS
+async fn list_all_videos(pool: web::Data<PgPool>) -> impl Responder {
+    let rows = sqlx::query_as::<_, (Uuid, String, String, String, String)>(
+        "SELECT m.id, m.file_url, m.type, m.uploaded_at::text, a.name FROM media m JOIN athletes a ON m.athlete_id = a.id WHERE m.type = 'video' ORDER BY m.uploaded_at DESC"
+    )
+    .fetch_all(&**pool)
+    .await;
+    
+    match rows {
+        Ok(rows) => {
+            let media_list: Vec<MediaResponse> = rows.iter().map(|r| MediaResponse {
+                id: r.0.to_string(), 
+                file_url: r.1.clone(), 
+                media_type: r.2.clone(), 
+                uploaded_at: r.3.clone(),
+                athlete_name: r.4.clone()
+            }).collect();
+            HttpResponse::Ok().json(media_list)
+        }
+        Err(e) => {
+            eprintln!("Erro ao buscar vídeos: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar vídeos")
+        }
+    }
+}
+
+// LISTAR TODAS AS FOTOS
+async fn list_all_photos(pool: web::Data<PgPool>) -> impl Responder {
+    let rows = sqlx::query_as::<_, (Uuid, String, String, String, String)>(
+        "SELECT m.id, m.file_url, m.type, m.uploaded_at::text, a.name FROM media m JOIN athletes a ON m.athlete_id = a.id WHERE m.type = 'photo' ORDER BY m.uploaded_at DESC"
+    )
+    .fetch_all(&**pool)
+    .await;
+    
+    match rows {
+        Ok(rows) => {
+            let media_list: Vec<MediaResponse> = rows.iter().map(|r| MediaResponse {
+                id: r.0.to_string(), 
+                file_url: r.1.clone(), 
+                media_type: r.2.clone(), 
+                uploaded_at: r.3.clone(),
+                athlete_name: r.4.clone()
+            }).collect();
+            HttpResponse::Ok().json(media_list)
+        }
+        Err(e) => {
+            eprintln!("Erro ao buscar fotos: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar fotos")
+        }
+    }
+}
+
+// --- ROTA DE FEED SOCIAL ---
+async fn get_social_feed(pool: web::Data<PgPool>) -> impl Responder {
+    let rows = sqlx::query_as::<_, (Uuid, String, String, String, Option<String>, Option<String>, String, i64, i64)>(
+        r#"
+        SELECT 
+            p.id,
+            u.name as author_name,
+            p.team_name,
+            p.content,
+            p.image_url,
+            p.video_url,
+            p.created_at::text,
+            (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as likes,
+            (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments
+        FROM posts p
+        JOIN users u ON p.author_id = u.id
+        ORDER BY p.created_at DESC
+        "#
+    )
+    .fetch_all(&**pool)
+    .await;
+
+    match rows {
+        Ok(rows) => {
+            let feed: Vec<SocialPost> = rows.iter().map(|r| SocialPost {
+                id: r.0.to_string(),
+                author_name: r.1.clone(),
+                team_name: r.2.clone(),
+                content: r.3.clone(),
+                image_url: r.4.clone(),
+                video_url: r.5.clone(),
+                created_at: r.6.clone(),
+                likes: r.7,
+                comments: r.8,
+            }).collect();
+            HttpResponse::Ok().json(feed)
+        }
+        Err(e) => {
+            eprintln!("Erro ao buscar feed social: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao buscar feed")
+        }
+    }
+}
+
+async fn create_post(req: web::Json<CreatePostRequest>, pool: web::Data<PgPool>) -> impl Responder {
+    let admin_id = sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE email = 'admin@retesp.com'")
+        .fetch_one(&**pool)
+        .await
+        .unwrap_or_else(|_| Uuid::nil());
+
+    match sqlx::query(
+        "INSERT INTO posts (author_id, team_name, content, image_url, video_url) VALUES ($1, $2, $3, $4, $5)"
+    )
+    .bind(admin_id)
+    .bind(&req.team_name)
+    .bind(&req.content)
+    .bind(&req.image_url)
+    .bind(&req.video_url)
+    .execute(&**pool)
+    .await {
+        Ok(_) => HttpResponse::Ok().json("Postagem criada com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao criar postagem: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao criar postagem")
+        }
+    }
+}
+
+async fn delete_post(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    match sqlx::query("DELETE FROM posts WHERE id = $1").bind(id).execute(&**pool).await {
+        Ok(_) => HttpResponse::Ok().json("Postagem excluída com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao excluir postagem: {}", e);
+            HttpResponse::InternalServerError().body("Erro ao excluir postagem")
+        }
+    }
+}
+
+// --- UPLOAD ---
+async fn upload_media(mut payload: Multipart, pool: web::Data<PgPool>) -> impl Responder {
+    let upload_dir = "./uploads";
+    if !Path::new(upload_dir).exists() {
+        if let Err(e) = fs::create_dir_all(upload_dir) {
+            eprintln!("Erro ao criar diretório de uploads: {}", e);
+            return HttpResponse::InternalServerError().body("Erro ao criar diretório de uploads");
+        }
+    }
+
+    let mut athlete_id: Option<Uuid> = None;
+    let mut filename: Option<String> = None;
+    let mut file_data: Option<Vec<u8>> = None;
+
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        let name = field.name().unwrap_or("");
+        if name == "athlete_id" {
+            let mut bytes = Vec::new();
+            while let Ok(Some(chunk)) = field.try_next().await {
+                bytes.extend_from_slice(&chunk);
+            }
+            if let Ok(id) = String::from_utf8(bytes) {
+                athlete_id = Uuid::parse_str(&id).ok();
+            }
+        } else if name == "file" {
+            let content_disposition = field.content_disposition().expect("Falha ao obter content disposition");
+            filename = content_disposition.get_filename().map(|s| s.to_string());
+            let mut data = Vec::new();
+            while let Ok(Some(chunk)) = field.try_next().await {
+                data.extend_from_slice(&chunk);
+            }
+            file_data = Some(data);
+        }
+    }
+
+    let file_data = match file_data {
+        Some(data) => data,
+        None => return HttpResponse::BadRequest().body("Nenhum arquivo enviado"),
+    };
+
+    let filename = filename.unwrap_or_else(|| "file.bin".to_string());
+    let file_path = format!("{}/{}", upload_dir, filename);
+
+    if let Err(e) = fs::write(&file_path, file_data) {
+        eprintln!("Erro ao salvar arquivo: {}", e);
+        return HttpResponse::InternalServerError().body("Erro ao salvar arquivo");
+    }
+
+    let file_url = format!("/uploads/{}", filename);
+    let file_type = if filename.ends_with(".mp4") || filename.ends_with(".mov") || filename.ends_with(".avi") {
+        "video"
+    } else if filename.ends_with(".pdf") {
+        "pdf"
+    } else {
+        "photo"
+    };
+
+    if let Some(id) = athlete_id {
+        let exists = sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM athletes WHERE id = $1)")
+            .bind(id)
+            .fetch_one(&**pool)
+            .await
+            .unwrap_or(false);
+
+        if exists {
+            let _ = sqlx::query(
+                "INSERT INTO media (athlete_id, file_url, type) VALUES ($1, $2, $3)"
+            )
+            .bind(id)
+            .bind(&file_url)
+            .bind(file_type)
+            .execute(&**pool)
+            .await;
+        }
+    }
+
+    return HttpResponse::Ok().json(serde_json::json!({"url": file_url}));
+}
+
+async fn generate_training(req: web::Json<AITrainingRequest>) -> impl Responder {
+    let client = ReqwestClient::new();
+    let prompt = format!(
+        "Crie um plano de treino de futebol detalhado para categoria {}, duração {}, com objetivo: {}.",
+        req.category, req.duration, req.objective
+    );
+    
+    let res = client
+        .post(format!("{}/api/generate", get_ollama_url()))
+        .json(&serde_json::json!({"model": "qwen2.5", "prompt": prompt, "stream": false}))
+        .send().await;
+    
+    match res {
+        Ok(r) => {
+            if let Ok(json_res) = r.json::<serde_json::Value>().await {
+                let response_text = json_res["response"]
+                    .as_str()
+                    .unwrap_or("Erro ao gerar treino.")
+                    .to_string();
+                return HttpResponse::Ok().body(response_text);
+            }
+            HttpResponse::InternalServerError().body("Erro ao processar IA")
+        }
+        Err(_) => HttpResponse::InternalServerError().body("Ollama indisponível")
+    }
+}
+
+// --- NOVAS ROTAS DE MÍDIA ---
+async fn delete_media(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+
+    let row = sqlx::query_as::<_, (String,)>(
+        "SELECT file_url FROM media WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&**pool)
+    .await;
+
+    let file_url = match row {
+        Ok(Some(r)) => r.0,
+        Ok(None) => return HttpResponse::NotFound().body("Mídia não encontrada"),
+        Err(e) => {
+            eprintln!("Erro ao buscar mídia: {}", e);
+            return HttpResponse::InternalServerError().body("Erro ao buscar mídia");
+        }
+    };
+
+    match sqlx::query("DELETE FROM media WHERE id = $1").bind(id).execute(&**pool).await {
+        Ok(_) => {
+            let file_path = format!(".{}", file_url);
+            if Path::new(&file_path).exists() {
+                let _ = fs::remove_file(file_path);
+            }
+            HttpResponse::Ok().json("Mídia excluída com sucesso!")
+        },
+        Err(e) => {
+            eprintln!("Erro ao excluir mídia: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+async fn rename_media(path: web::Path<Uuid>, req: web::Json<RenameMediaRequest>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
+    let new_name = req.new_name.trim();
+
+    if new_name.is_empty() {
+        return HttpResponse::BadRequest().body("Nome não pode ser vazio");
+    }
+
+    let row = sqlx::query_as::<_, (String,)>(
+        "SELECT file_url FROM media WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_optional(&**pool)
+    .await;
+
+    let old_file_url = match row {
+        Ok(Some(r)) => r.0,
+        Ok(None) => return HttpResponse::NotFound().body("Mídia não encontrada"),
+        Err(e) => {
+            eprintln!("Erro ao buscar mídia: {}", e);
+            return HttpResponse::InternalServerError().body("Erro ao buscar mídia");
+        }
+    };
+
+    let old_path = format!(".{}", old_file_url);
+    let extension = Path::new(&old_path).extension().and_then(|e| e.to_str()).unwrap_or("");
+    let new_filename = format!("{}.{}", new_name, extension);
+    let new_file_url = format!("/uploads/{}", new_filename);
+    let new_path = format!(".{}", new_file_url);
+
+    if let Err(e) = fs::rename(&old_path, &new_path) {
+        eprintln!("Erro ao renomear arquivo: {}", e);
+        return HttpResponse::InternalServerError().body("Erro ao renomear arquivo");
+    }
+
+    match sqlx::query(
+        "UPDATE media SET file_url = $1 WHERE id = $2"
+    )
+    .bind(&new_file_url)
+    .bind(id)
+    .execute(&**pool)
+    .await {
+        Ok(_) => HttpResponse::Ok().json("Mídia renomeada com sucesso!"),
+        Err(e) => {
+            eprintln!("Erro ao atualizar mídia: {}", e);
+            HttpResponse::InternalServerError().body(format!("Erro do banco: {}", e))
+        }
+    }
+}
+
+// --- MAIN ---
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    dotenv::dotenv().ok();
+    env_logger::init();
+    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&db_url)
+        .await
+        .expect("Erro ao conectar no banco");
+    
+    // Executar migrações automaticamente
+    if let Err(e) = migrations::run_migrations(&pool).await {
+        eprintln!("❌ Erro ao executar migrações: {}", e);
+    }
+    
+    println!("🔥 RETESP Backend v41.0 (Com migrações automáticas)");
+
+    HttpServer::new(move || {
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header();
+        App::new()
+            .app_data(web::Data::new(pool.clone()))
+            .wrap(cors)
+            .wrap(Logger::default())
+            .service(Files::new("/uploads", "./uploads").show_files_listing())
+            .route("/login", web::post().to(login))
+            .route("/athletes", web::get().to(list_athletes))
+            .route("/athletes", web::post().to(create_athlete))
+            .route("/athletes/{id}", web::get().to(get_athlete))
+            .route("/athletes/{id}", web::put().to(update_athlete))
+            .route("/athletes/{id}", web::delete().to(delete_athlete))
+            .route("/coaches", web::get().to(list_coaches))
+            .route("/coaches", web::post().to(create_coach))
+            .route("/coaches/{id}", web::get().to(get_coach))
+            .route("/coaches/{id}", web::put().to(update_coach))
+            .route("/coaches/{id}", web::delete().to(delete_coach))
+            .route("/teams", web::get().to(list_teams))
+            .route("/teams", web::post().to(create_team))
+            .route("/teams/{id}", web::get().to(get_team))
+            .route("/teams/{id}", web::put().to(update_team))
+            .route("/teams/{id}", web::delete().to(delete_team))
+            .route("/attendance/team/{team_id}", web::get().to(list_attendance_by_team))
+            .route("/attendance", web::post().to(register_attendance))
+            .route("/attendance/today", web::get().to(get_attendance_by_date))
+            .route("/attendance/athlete/{athlete_id}", web::get().to(get_athlete_attendance))
+            .route("/parents/summary/{athlete_id}", web::get().to(get_athlete_summary))
+            .route("/parents/media/{athlete_id}", web::get().to(list_media_by_athlete))
+            .route("/media/videos", web::get().to(list_all_videos))
+            .route("/media/photos", web::get().to(list_all_photos))
+            .route("/social/feed", web::get().to(get_social_feed))
+            .route("/social/posts", web::post().to(create_post))
+            .route("/social/posts/{id}", web::delete().to(delete_post))
+            .route("/media/{id}", web::delete().to(delete_media))
+            .route("/media/{id}", web::put().to(rename_media))
+            .route("/upload", web::post().to(upload_media))
+            .route("/ai/generate_training", web::post().to(generate_training))
+    })
+    .bind(("0.0.0.0", 8080))?
+    .run()
+    .await
+}
