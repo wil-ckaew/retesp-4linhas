@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="15" fill="#EF4444"/>
-  <text x="50" y="68" font-size="40" text-anchor="middle" fill="white" font-weight="bold">4L</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="30" fill="#EF4444"/>
+  <text x="100" y="130" font-size="80" text-anchor="middle" fill="white" font-weight="bold" font-family="Arial, sans-serif">4L</text>
+  <circle cx="160" cy="40" r="20" fill="#10B981"/>
+  <text x="160" y="48" font-size="16" text-anchor="middle" fill="white" font-weight="bold">⚽</text>
 </svg>

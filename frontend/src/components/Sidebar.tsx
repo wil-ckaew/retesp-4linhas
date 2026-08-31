@@ -3,7 +3,7 @@ import Image from "next/image";
 import { 
   LayoutDashboard, Users, UserCog, Users2, Calendar, 
   CheckSquare, Camera, Video, Share2, MessageSquare, 
-  Award, Brain, FileText, Map, Settings 
+  Award, Brain, FileText, Map, Settings, Trophy
 } from "lucide-react";
 
 const menu = [
@@ -18,7 +18,7 @@ const menu = [
   { name: "Vídeos", href: "/media/videos", icon: Video },
   { name: "Rede Social", href: "/social", icon: Share2 },
   { name: "Chat", href: "/chat", icon: MessageSquare },
-  { name: "Ranking", href: "/ranking", icon: Award },
+  { name: "Ranking", href: "/ranking", icon: Trophy },
   { name: "IA RETESP", href: "/ai", icon: Brain },
   { name: "Relatórios", href: "/reports", icon: FileText },
   { name: "Mapa Social", href: "/map", icon: Map },

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { API_URL } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 
 interface Training {
   id: string;
@@ -32,6 +33,7 @@ interface Training {
 }
 
 export default function TrainingsScreen() {
+  const { colors, isDark } = useTheme();
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [filteredTrainings, setFilteredTrainings] = useState<Training[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +54,343 @@ export default function TrainingsScreen() {
     date: '',
     time: '',
     exercises: [] as string[],
+  });
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+      marginTop: 8,
+    },
+    header: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 8,
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    headerSubtitle: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginVertical: 8,
+      paddingHorizontal: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    searchIcon: {
+      marginRight: 8,
+    },
+    searchInput: {
+      flex: 1,
+      color: colors.text,
+      paddingVertical: 12,
+      fontSize: 15,
+    },
+    filtersContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    filterButton: {
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 20,
+      backgroundColor: colors.hover,
+      marginRight: 8,
+    },
+    filterActive: {
+      backgroundColor: colors.primary,
+    },
+    filterText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    filterTextActive: {
+      color: '#FFFFFF',
+    },
+    categoryFilters: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
+    categoryButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 16,
+      backgroundColor: colors.hover,
+      marginRight: 6,
+    },
+    categoryActive: {
+      backgroundColor: colors.primary,
+    },
+    categoryText: {
+      color: colors.textSecondary,
+      fontSize: 11,
+    },
+    categoryTextActive: {
+      color: '#FFFFFF',
+    },
+    createButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+      marginHorizontal: 16,
+      marginVertical: 8,
+      paddingVertical: 12,
+      borderRadius: 12,
+      gap: 8,
+    },
+    createButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 40,
+    },
+    emptyTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+      marginTop: 12,
+    },
+    emptySubtitle: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      marginTop: 4,
+    },
+    trainingCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      marginHorizontal: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 16,
+    },
+    cardHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    statusIndicator: {
+      width: 4,
+      height: 40,
+      borderRadius: 2,
+      marginRight: 12,
+    },
+    cardTitleContainer: {
+      flex: 1,
+    },
+    cardTitle: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    cardMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 2,
+      gap: 4,
+    },
+    cardMetaText: {
+      color: colors.textSecondary,
+      fontSize: 11,
+    },
+    cardBody: {
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+    },
+    cardBadges: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginBottom: 8,
+    },
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.hover,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      gap: 4,
+    },
+    badgeText: {
+      color: colors.textSecondary,
+      fontSize: 11,
+    },
+    cardDescription: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 4,
+    },
+    cardDetails: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    detailRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 6,
+    },
+    detailText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    exercisesContainer: {
+      marginTop: 8,
+    },
+    exercisesTitle: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+      marginBottom: 4,
+    },
+    exerciseItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginVertical: 2,
+    },
+    exerciseDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.primary,
+    },
+    exerciseText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    cardActions: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 12,
+    },
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      gap: 6,
+      flex: 1,
+    },
+    actionEdit: {
+      backgroundColor: colors.primary,
+    },
+    actionDelete: {
+      backgroundColor: '#EF4444',
+    },
+    actionText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '500',
+    },
+    footerSpacer: {
+      height: 20,
+    },
+    modalContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 20,
+      maxHeight: '90%',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    modalTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    formGroup: {
+      marginBottom: 12,
+    },
+    formLabel: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      marginBottom: 4,
+    },
+    formInput: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: colors.text,
+      fontSize: 15,
+    },
+    formTextArea: {
+      minHeight: 80,
+      textAlignVertical: 'top',
+    },
+    formRow: {
+      flexDirection: 'row',
+    },
+    submitButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+      paddingVertical: 14,
+      borderRadius: 12,
+      gap: 8,
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    submitButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
   });
 
   const fetchTrainings = useCallback(async () => {
@@ -174,7 +513,7 @@ export default function TrainingsScreen() {
       case 'in_progress': return '#3B82F6';
       case 'completed': return '#10B981';
       case 'cancelled': return '#EF4444';
-      default: return '#6B7280';
+      default: return colors.textSecondary;
     }
   };
 
@@ -260,7 +599,7 @@ export default function TrainingsScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Carregando treinos...</Text>
       </View>
     );
@@ -269,7 +608,7 @@ export default function TrainingsScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B82F6" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -280,11 +619,11 @@ export default function TrainingsScreen() {
         </View>
 
         <View style={styles.searchContainer}>
-          <Icon name="search-outline" size={20} color="#6B7280" style={styles.searchIcon} />
+          <Icon name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Buscar treino..."
-            placeholderTextColor="#6B7280"
+            placeholderTextColor={colors.textSecondary}
             value={searchTerm}
             onChangeText={setSearchTerm}
           />
@@ -319,7 +658,7 @@ export default function TrainingsScreen() {
 
         {filteredTrainings.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Icon name="fitness-outline" size={60} color="#6B7280" />
+            <Icon name="fitness-outline" size={60} color={colors.textSecondary} />
             <Text style={styles.emptyTitle}>Nenhum treino encontrado</Text>
             <Text style={styles.emptySubtitle}>Comece criando seu primeiro treino</Text>
           </View>
@@ -337,12 +676,12 @@ export default function TrainingsScreen() {
                     <View style={styles.cardTitleContainer}>
                       <Text style={styles.cardTitle} numberOfLines={1}>{training.title}</Text>
                       <View style={styles.cardMeta}>
-                        <Icon name="calendar-outline" size={12} color="#6B7280" />
+                        <Icon name="calendar-outline" size={12} color={colors.textSecondary} />
                         <Text style={styles.cardMetaText}>{formatDate(training.date)} • {training.time}</Text>
                       </View>
                     </View>
                   </View>
-                  <Icon name={isExpanded ? 'chevron-up-outline' : 'chevron-down-outline'} size={24} color="#6B7280" />
+                  <Icon name={isExpanded ? 'chevron-up-outline' : 'chevron-down-outline'} size={24} color={colors.textSecondary} />
                 </TouchableOpacity>
 
                 <View style={styles.cardBody}>
@@ -352,11 +691,11 @@ export default function TrainingsScreen() {
                       <Text style={[styles.badgeText, { color: statusColor }]}>{getStatusLabel(training.status)}</Text>
                     </View>
                     <View style={styles.badge}>
-                      <Icon name="people-outline" size={14} color="#6B7280" />
+                      <Icon name="people-outline" size={14} color={colors.textSecondary} />
                       <Text style={styles.badgeText}>{training.athlete_count} atletas</Text>
                     </View>
                     <View style={styles.badge}>
-                      <Icon name="time-outline" size={14} color="#6B7280" />
+                      <Icon name="time-outline" size={14} color={colors.textSecondary} />
                       <Text style={styles.badgeText}>{training.duration} min</Text>
                     </View>
                   </View>
@@ -365,25 +704,39 @@ export default function TrainingsScreen() {
 
                   {isExpanded && (
                     <View style={styles.cardDetails}>
-                      <View style={styles.detailRow}><Icon name="school-outline" size={16} color="#6B7280" /><Text style={styles.detailText}>Categoria: {training.category}</Text></View>
+                      <View style={styles.detailRow}>
+                        <Icon name="school-outline" size={16} color={colors.textSecondary} />
+                        <Text style={styles.detailText}>Categoria: {training.category}</Text>
+                      </View>
                       {training.coach_name && (
-                        <View style={styles.detailRow}><Icon name="person-outline" size={16} color="#6B7280" /><Text style={styles.detailText}>Técnico: {training.coach_name}</Text></View>
+                        <View style={styles.detailRow}>
+                          <Icon name="person-outline" size={16} color={colors.textSecondary} />
+                          <Text style={styles.detailText}>Técnico: {training.coach_name}</Text>
+                        </View>
                       )}
-                      <View style={styles.detailRow}><Icon name="flag-outline" size={16} color="#6B7280" /><Text style={styles.detailText}>Objetivo: {training.objective}</Text></View>
+                      <View style={styles.detailRow}>
+                        <Icon name="flag-outline" size={16} color={colors.textSecondary} />
+                        <Text style={styles.detailText}>Objetivo: {training.objective}</Text>
+                      </View>
                       {training.exercises && training.exercises.length > 0 && (
                         <View style={styles.exercisesContainer}>
                           <Text style={styles.exercisesTitle}>💪 Exercícios:</Text>
                           {training.exercises.map((ex, idx) => (
-                            <View key={idx} style={styles.exerciseItem}><View style={styles.exerciseDot} /><Text style={styles.exerciseText}>{ex}</Text></View>
+                            <View key={idx} style={styles.exerciseItem}>
+                              <View style={styles.exerciseDot} />
+                              <Text style={styles.exerciseText}>{ex}</Text>
+                            </View>
                           ))}
                         </View>
                       )}
                       <View style={styles.cardActions}>
                         <TouchableOpacity style={[styles.actionButton, styles.actionEdit]} onPress={() => Alert.alert('Editar', `Editar: ${training.title}`)}>
-                          <Icon name="create-outline" size={18} color="#FFFFFF" /><Text style={styles.actionText}>Editar</Text>
+                          <Icon name="create-outline" size={18} color="#FFFFFF" />
+                          <Text style={styles.actionText}>Editar</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.actionButton, styles.actionDelete]} onPress={() => deleteTraining(training.id)}>
-                          <Icon name="trash-outline" size={18} color="#FFFFFF" /><Text style={styles.actionText}>Excluir</Text>
+                          <Icon name="trash-outline" size={18} color="#FFFFFF" />
+                          <Text style={styles.actionText}>Excluir</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -403,23 +756,106 @@ export default function TrainingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>📝 Criar Treino</Text>
-              <TouchableOpacity onPress={() => setShowCreateModal(false)}><Icon name="close-outline" size={28} color="#6B7280" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowCreateModal(false)}>
+                <Icon name="close-outline" size={28} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.formGroup}><Text style={styles.formLabel}>Título *</Text><TextInput style={styles.formInput} placeholder="Digite o título" placeholderTextColor="#6B7280" value={newTraining.title} onChangeText={(text) => setNewTraining({ ...newTraining, title: text })} /></View>
-              <View style={styles.formGroup}><Text style={styles.formLabel}>Descrição</Text><TextInput style={[styles.formInput, styles.formTextArea]} placeholder="Descreva o treino" placeholderTextColor="#6B7280" multiline numberOfLines={3} value={newTraining.description} onChangeText={(text) => setNewTraining({ ...newTraining, description: text })} /></View>
-              <View style={styles.formRow}>
-                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}><Text style={styles.formLabel}>Categoria *</Text><TextInput style={styles.formInput} placeholder="Ex: Sub-12" placeholderTextColor="#6B7280" value={newTraining.category} onChangeText={(text) => setNewTraining({ ...newTraining, category: text })} /></View>
-                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}><Text style={styles.formLabel}>Duração (min)</Text><TextInput style={styles.formInput} placeholder="60" placeholderTextColor="#6B7280" keyboardType="numeric" value={newTraining.duration} onChangeText={(text) => setNewTraining({ ...newTraining, duration: text })} /></View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Título *</Text>
+                <TextInput 
+                  style={styles.formInput} 
+                  placeholder="Digite o título" 
+                  placeholderTextColor={colors.textSecondary} 
+                  value={newTraining.title} 
+                  onChangeText={(text) => setNewTraining({ ...newTraining, title: text })} 
+                />
+              </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Descrição</Text>
+                <TextInput 
+                  style={[styles.formInput, styles.formTextArea]} 
+                  placeholder="Descreva o treino" 
+                  placeholderTextColor={colors.textSecondary} 
+                  multiline numberOfLines={3} 
+                  value={newTraining.description} 
+                  onChangeText={(text) => setNewTraining({ ...newTraining, description: text })} 
+                />
               </View>
               <View style={styles.formRow}>
-                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}><Text style={styles.formLabel}>Data *</Text><TextInput style={styles.formInput} placeholder="YYYY-MM-DD" placeholderTextColor="#6B7280" value={newTraining.date} onChangeText={(text) => setNewTraining({ ...newTraining, date: text })} /></View>
-                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}><Text style={styles.formLabel}>Horário</Text><TextInput style={styles.formInput} placeholder="HH:MM" placeholderTextColor="#6B7280" value={newTraining.time} onChangeText={(text) => setNewTraining({ ...newTraining, time: text })} /></View>
+                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.formLabel}>Categoria *</Text>
+                  <TextInput 
+                    style={styles.formInput} 
+                    placeholder="Ex: Sub-12" 
+                    placeholderTextColor={colors.textSecondary} 
+                    value={newTraining.category} 
+                    onChangeText={(text) => setNewTraining({ ...newTraining, category: text })} 
+                  />
+                </View>
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.formLabel}>Duração (min)</Text>
+                  <TextInput 
+                    style={styles.formInput} 
+                    placeholder="60" 
+                    placeholderTextColor={colors.textSecondary} 
+                    keyboardType="numeric" 
+                    value={newTraining.duration} 
+                    onChangeText={(text) => setNewTraining({ ...newTraining, duration: text })} 
+                  />
+                </View>
               </View>
-              <View style={styles.formGroup}><Text style={styles.formLabel}>Objetivo</Text><TextInput style={styles.formInput} placeholder="Ex: Melhorar precisão" placeholderTextColor="#6B7280" value={newTraining.objective} onChangeText={(text) => setNewTraining({ ...newTraining, objective: text })} /></View>
-              <View style={styles.formGroup}><Text style={styles.formLabel}>Exercícios (um por linha)</Text><TextInput style={[styles.formInput, styles.formTextArea]} placeholder="Chute&#10;Cabeceio" placeholderTextColor="#6B7280" multiline numberOfLines={3} value={newTraining.exercises.join('\n')} onChangeText={(text) => setNewTraining({ ...newTraining, exercises: text.split('\n').filter(s => s.trim()) })} /></View>
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.formLabel}>Data *</Text>
+                  <TextInput 
+                    style={styles.formInput} 
+                    placeholder="YYYY-MM-DD" 
+                    placeholderTextColor={colors.textSecondary} 
+                    value={newTraining.date} 
+                    onChangeText={(text) => setNewTraining({ ...newTraining, date: text })} 
+                  />
+                </View>
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.formLabel}>Horário</Text>
+                  <TextInput 
+                    style={styles.formInput} 
+                    placeholder="HH:MM" 
+                    placeholderTextColor={colors.textSecondary} 
+                    value={newTraining.time} 
+                    onChangeText={(text) => setNewTraining({ ...newTraining, time: text })} 
+                  />
+                </View>
+              </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Objetivo</Text>
+                <TextInput 
+                  style={styles.formInput} 
+                  placeholder="Ex: Melhorar precisão" 
+                  placeholderTextColor={colors.textSecondary} 
+                  value={newTraining.objective} 
+                  onChangeText={(text) => setNewTraining({ ...newTraining, objective: text })} 
+                />
+              </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Exercícios (um por linha)</Text>
+                <TextInput 
+                  style={[styles.formInput, styles.formTextArea]} 
+                  placeholder="Chute&#10;Cabeceio" 
+                  placeholderTextColor={colors.textSecondary} 
+                  multiline numberOfLines={3} 
+                  value={newTraining.exercises.join('\n')} 
+                  onChangeText={(text) => setNewTraining({ ...newTraining, exercises: text.split('\n').filter(s => s.trim()) })} 
+                />
+              </View>
               <TouchableOpacity style={styles.submitButton} onPress={createTraining} disabled={creating}>
-                {creating ? <ActivityIndicator size="small" color="#FFFFFF" /> : <><Icon name="add-circle-outline" size={20} color="#FFFFFF" /><Text style={styles.submitButtonText}>Criar Treino</Text></>}
+                {creating ? 
+                  <ActivityIndicator size="small" color="#FFFFFF" /> : 
+                  <>
+                    <Icon name="add-circle-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.submitButtonText}>Criar Treino</Text>
+                  </>
+                }
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -428,68 +864,3 @@ export default function TrainingsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1117' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1117' },
-  loadingText: { color: '#6B7280', marginTop: 8 },
-  header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF' },
-  headerSubtitle: { fontSize: 14, color: '#6B7280', marginTop: 4 },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#161B22', borderRadius: 12, marginHorizontal: 16, marginVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#30363D' },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, color: '#FFFFFF', paddingVertical: 12, fontSize: 15 },
-  filtersContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 8 },
-  filterButton: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: '#21262D', marginRight: 8 },
-  filterActive: { backgroundColor: '#3B82F6' },
-  filterText: { color: '#9CA3AF', fontSize: 12 },
-  filterTextActive: { color: '#FFFFFF' },
-  categoryFilters: { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 8 },
-  categoryButton: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16, backgroundColor: '#21262D', marginRight: 6 },
-  categoryActive: { backgroundColor: '#3B82F6' },
-  categoryText: { color: '#9CA3AF', fontSize: 11 },
-  categoryTextActive: { color: '#FFFFFF' },
-  createButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3B82F6', marginHorizontal: 16, marginVertical: 8, paddingVertical: 12, borderRadius: 12, gap: 8 },
-  createButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
-  emptyTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', marginTop: 12 },
-  emptySubtitle: { color: '#6B7280', fontSize: 14, marginTop: 4 },
-  trainingCard: { backgroundColor: '#161B22', borderRadius: 16, marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#30363D', overflow: 'hidden' },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
-  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  statusIndicator: { width: 4, height: 40, borderRadius: 2, marginRight: 12 },
-  cardTitleContainer: { flex: 1 },
-  cardTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 },
-  cardMetaText: { color: '#6B7280', fontSize: 11 },
-  cardBody: { paddingHorizontal: 16, paddingBottom: 16 },
-  cardBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
-  badge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#21262D', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
-  badgeText: { color: '#9CA3AF', fontSize: 11 },
-  cardDescription: { color: '#D1D5DB', fontSize: 14, lineHeight: 20, marginTop: 4 },
-  cardDetails: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#30363D' },
-  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  detailText: { color: '#D1D5DB', fontSize: 13 },
-  exercisesContainer: { marginTop: 8 },
-  exercisesTitle: { color: '#9CA3AF', fontSize: 13, fontWeight: '600', marginBottom: 4 },
-  exerciseItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 2 },
-  exerciseDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#3B82F6' },
-  exerciseText: { color: '#D1D5DB', fontSize: 13 },
-  cardActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  actionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, gap: 6, flex: 1 },
-  actionEdit: { backgroundColor: '#3B82F6' },
-  actionDelete: { backgroundColor: '#EF4444' },
-  actionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '500' },
-  footerSpacer: { height: 20 },
-  modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#161B22', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' },
-  formGroup: { marginBottom: 12 },
-  formLabel: { color: '#9CA3AF', fontSize: 13, marginBottom: 4 },
-  formInput: { backgroundColor: '#0D1117', borderWidth: 1, borderColor: '#30363D', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, color: '#FFFFFF', fontSize: 15 },
-  formTextArea: { minHeight: 80, textAlignVertical: 'top' },
-  formRow: { flexDirection: 'row' },
-  submitButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3B82F6', paddingVertical: 14, borderRadius: 12, gap: 8, marginTop: 8, marginBottom: 16 },
-  submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-});

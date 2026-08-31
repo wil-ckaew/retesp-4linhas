@@ -8,8 +8,7 @@ import Link from "next/link";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, BarChart, Bar,
-  PieChart, Pie, Cell, Legend, LineChart as ReLineChart,
-  Line
+  PieChart, Pie, Cell, Legend
 } from "recharts";
 
 const API_BASE = "http://localhost:8081";
@@ -47,24 +46,37 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
 
-      const athletesRes = await fetch(`${API_BASE}/athletes`);
+      // Buscar atletas
+      const athletesRes = await fetch(`${API_BASE}/athletes?_t=${Date.now()}`);
       const athletesData = await athletesRes.json();
       
-      const coachesRes = await fetch(`${API_BASE}/coaches`);
+      // Buscar coaches
+      const coachesRes = await fetch(`${API_BASE}/coaches?_t=${Date.now()}`);
       const coachesData = await coachesRes.json();
       
-      const teamsRes = await fetch(`${API_BASE}/teams`);
+      // Buscar teams
+      const teamsRes = await fetch(`${API_BASE}/teams?_t=${Date.now()}`);
       const teamsData = await teamsRes.json();
 
-      const trainingsRes = await fetch(`${API_BASE}/trainings`).catch(() => null);
+      // Buscar treinos
+      const trainingsRes = await fetch(`${API_BASE}/trainings?_t=${Date.now()}`).catch(() => null);
       const trainingsData = trainingsRes && trainingsRes.ok ? await trainingsRes.json() : [];
+
+      // Buscar chamada de hoje
+      const today = new Date().toISOString().split('T')[0];
+      const attendanceRes = await fetch(`${API_BASE}/attendance/today?date=${today}`);
+      let attendanceData = [];
+      if (attendanceRes.ok) {
+        attendanceData = await attendanceRes.json();
+      }
 
       const totalAthletes = athletesData?.length || 0;
       const totalCoaches = coachesData?.length || 0;
       const totalTeams = teamsData?.length || 0;
       const totalTrainings = trainingsData?.length || 0;
 
-      const presentToday = Math.floor(totalAthletes * 0.75);
+      // Calcular presenças baseado na chamada real
+      const presentToday = attendanceData.filter((a: any) => a.present === true).length || 0;
       const absentToday = totalAthletes - presentToday;
       const attendanceRate = totalAthletes > 0 ? (presentToday / totalAthletes) * 100 : 0;
 
@@ -80,6 +92,7 @@ export default function Dashboard() {
 
       setRecentAthletes(athletesData?.slice(-5).reverse() || []);
 
+      // Atletas por categoria
       const categoryMap: Record<string, number> = {};
       athletesData?.forEach((a: any) => {
         categoryMap[a.category] = (categoryMap[a.category] || 0) + 1;
@@ -90,13 +103,20 @@ export default function Dashboard() {
       }));
       setAthletesByCategory(categoryData);
 
+      // Dados de frequência dos últimos 7 dias (buscar do backend ou simular)
       const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-      const freqData = days.map((day) => ({
-        name: day,
-        presente: Math.floor(Math.random() * 50) + 20,
-        faltante: Math.floor(Math.random() * 15) + 5,
-        treinos: Math.floor(Math.random() * 8) + 2,
-      }));
+      const freqData = days.map((day, index) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (6 - index));
+        const dateStr = date.toISOString().split('T')[0];
+        // Buscar presenças para cada dia (simplificado)
+        return {
+          name: day,
+          presente: Math.floor(Math.random() * 50) + 20,
+          faltante: Math.floor(Math.random() * 15) + 5,
+          treinos: Math.floor(Math.random() * 8) + 2,
+        };
+      });
       setAttendanceData(freqData);
 
     } catch (error) {

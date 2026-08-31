@@ -20,8 +20,8 @@ import { API_URL } from '../services/api';
 import * as ImagePicker from 'expo-image-picker';
 import { useStatus } from '../context/StatusContext';
 import { StatusLogo } from '../components/StatusLogo';
+import { useTheme } from '../context/ThemeContext';
 
-// Importar Video apenas para mobile
 let Video: any = null;
 if (Platform.OS !== 'web') {
   try {
@@ -57,6 +57,7 @@ interface Story {
 }
 
 export default function SocialScreen() {
+  const { colors, isDark } = useTheme();
   const { stories, addStoryToBackend, fetchStories, deleteExpiredStories } = useStatus();
   const [posts, setPosts] = useState<Post[]>([]);
   const [filteredPosts, setFilteredPosts] = useState<Post[]>([]);
@@ -74,6 +75,559 @@ export default function SocialScreen() {
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [likes, setLikes] = useState<Record<string, number>>({});
   const [videoError, setVideoError] = useState(false);
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+      marginTop: 8,
+    },
+    header: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 8,
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    headerSubtitle: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    storiesContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.card,
+      marginHorizontal: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 12,
+    },
+    storiesHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    storiesTitle: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    storiesScroll: {
+      flexDirection: 'row',
+    },
+    storyItem: {
+      alignItems: 'center',
+      marginRight: 16,
+    },
+    storyAvatarWrapper: {
+      padding: 2,
+    },
+    storyAvatar: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      borderWidth: 3,
+      padding: 2,
+      backgroundColor: colors.card,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    storyRETESP: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 30,
+      backgroundColor: '#1A1A2E',
+      justifyContent: 'center',
+      alignItems: 'center',
+      position: 'relative',
+    },
+    storyRETESPText: {
+      color: '#FF4444',
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    storyRETESPBadge: {
+      position: 'absolute',
+      bottom: 2,
+      right: 2,
+      backgroundColor: '#00FF88',
+      borderRadius: 8,
+      paddingHorizontal: 4,
+      paddingVertical: 1,
+    },
+    storyRETESPBadgeText: {
+      color: '#1A1A2E',
+      fontSize: 6,
+      fontWeight: 'bold',
+    },
+    storyAvatarImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 30,
+    },
+    storyAvatarDefault: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 30,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    storyAvatarText: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    storyVideoPlaceholder: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 30,
+      backgroundColor: '#1E1E1E',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    storyUserName: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      marginTop: 4,
+      maxWidth: 64,
+    },
+    filterContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+    },
+    filterButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      borderRadius: 20,
+      backgroundColor: colors.hover,
+      marginRight: 8,
+    },
+    filterButtonActive: {
+      backgroundColor: colors.primary,
+    },
+    filterText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '500',
+    },
+    filterTextActive: {
+      color: '#FFFFFF',
+    },
+    createPost: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 16,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    createPostHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    createPostAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    createPostAvatarText: {
+      color: '#FFFFFF',
+      fontSize: 18,
+    },
+    postInput: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 15,
+      minHeight: 40,
+      paddingTop: 8,
+      textAlignVertical: 'top',
+    },
+    mediaPreviewContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginVertical: 8,
+      marginLeft: 48,
+    },
+    mediaPreview: {
+      position: 'relative',
+      width: 72,
+      height: 72,
+      borderRadius: 8,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    previewImage: {
+      width: '100%',
+      height: '100%',
+    },
+    previewVideo: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    removeMedia: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      borderRadius: 12,
+    },
+    postActions: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 8,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      marginLeft: 48,
+    },
+    mediaButtons: {
+      flexDirection: 'row',
+      gap: 16,
+    },
+    postRightActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    postButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+      borderRadius: 8,
+      minWidth: 80,
+      alignItems: 'center',
+    },
+    postButtonText: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    postCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 16,
+      marginHorizontal: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    postHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 8,
+    },
+    postAuthor: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    authorAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    authorAvatarText: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    authorName: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    authorTeam: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    postDate: {
+      color: colors.textSecondary,
+      fontSize: 11,
+    },
+    postContent: {
+      color: colors.text,
+      fontSize: 15,
+      marginBottom: 8,
+      lineHeight: 22,
+    },
+    postImage: {
+      width: '100%',
+      height: 200,
+      borderRadius: 12,
+      marginBottom: 8,
+    },
+    videoContainer: {
+      width: '100%',
+      height: 220,
+      borderRadius: 12,
+      marginBottom: 8,
+      backgroundColor: '#000000',
+      overflow: 'hidden',
+    },
+    videoPlayer: {
+      width: '100%',
+      height: '100%',
+    },
+    videoFallback: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    videoFallbackText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    videoLoading: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      zIndex: 1,
+    },
+    postFooter: {
+      flexDirection: 'row',
+      gap: 20,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: 12,
+    },
+    postAction: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    postActionText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    footerSpacer: {
+      height: 20,
+    },
+    storyModalContainer: {
+      flex: 1,
+      backgroundColor: '#000000',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+    },
+    storyModalClose: {
+      position: 'absolute',
+      top: 40,
+      left: 20,
+      zIndex: 10,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 10,
+      borderRadius: 25,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
+    storyModalContent: {
+      width: '100%',
+      maxWidth: 400,
+      alignItems: 'center',
+    },
+    storyModalHeader: {
+      marginBottom: 16,
+    },
+    storyModalUser: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    storyModalRETESP: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    storyModalRETESPText: {
+      color: '#FF4444',
+      fontSize: 24,
+      fontWeight: 'bold',
+    },
+    storyModalRETESPBadge: {
+      backgroundColor: '#00FF88',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    storyModalRETESPBadgeText: {
+      color: '#1A1A2E',
+      fontSize: 16,
+    },
+    storyModalRETESPContent: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+    },
+    storyModalRETESPBig: {
+      color: '#FF4444',
+      fontSize: 48,
+      fontWeight: 'bold',
+    },
+    storyModalRETESPBigSub: {
+      color: '#00FF88',
+      fontSize: 24,
+      fontWeight: 'bold',
+    },
+    storyModalRETESPDesc: {
+      color: colors.textSecondary,
+      fontSize: 16,
+      marginTop: 8,
+    },
+    storyModalMedia: {
+      width: '100%',
+      height: height * 0.6,
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      overflow: 'hidden',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    storyModalImage: {
+      width: '100%',
+      height: '100%',
+    },
+    storyModalVideo: {
+      width: '100%',
+      height: '100%',
+    },
+    storyVideoContainer: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: '#000000',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    storyModalEmpty: {
+      alignItems: 'center',
+    },
+    storyModalEmptyText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      marginTop: 8,
+    },
+    storyModalButton: {
+      marginTop: 20,
+      backgroundColor: colors.primary,
+      paddingHorizontal: 32,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    storyModalButtonText: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+      fontSize: 16,
+    },
+    shareModalContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    shareModalContent: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 24,
+      width: '100%',
+      maxWidth: 400,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    shareModalTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    shareOptions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 16,
+    },
+    shareOption: {
+      alignItems: 'center',
+      width: 70,
+    },
+    shareIcon: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    statusIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    statusGradient: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: '#8B5CF6',
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
+      borderRadius: 16,
+    },
+    shareLabel: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      textAlign: 'center',
+    },
+    shareCancelButton: {
+      marginTop: 16,
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    shareCancelText: {
+      color: colors.textSecondary,
+      fontSize: 16,
+      textAlign: 'center',
+      fontWeight: '500',
+    },
+  });
 
   const fetchPosts = async () => {
     try {
@@ -444,7 +998,7 @@ export default function SocialScreen() {
     if (error || !Video) {
       return (
         <View style={[styles.videoPlayer, styles.videoFallback]}>
-          <Icon name="play-circle" size={40} color="#3B82F6" />
+          <Icon name="play-circle" size={40} color={colors.primary} />
           <Text style={styles.videoFallbackText}>Vídeo não disponível</Text>
         </View>
       );
@@ -454,7 +1008,7 @@ export default function SocialScreen() {
       <View style={style || styles.videoPlayer}>
         {loading && (
           <View style={styles.videoLoading}>
-            <ActivityIndicator size="large" color="#3B82F6" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         )}
         <Video
@@ -493,11 +1047,10 @@ export default function SocialScreen() {
             fetchStories();
             deleteExpiredStories();
           }}>
-            <Icon name="refresh" size={20} color="#3B82F6" />
+            <Icon name="refresh" size={20} color={colors.primary} />
           </TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesScroll}>
-          {/* Story RETESP 4L com StatusLogo */}
           <TouchableOpacity
             style={styles.storyItem}
             onPress={() => openStory(retespStory)}
@@ -523,7 +1076,7 @@ export default function SocialScreen() {
                 onPress={() => openStory(story)}
               >
                 <View style={styles.storyAvatarWrapper}>
-                  <View style={[styles.storyAvatar, { borderColor: isVideo ? '#8B5CF6' : '#3B82F6' }]}>
+                  <View style={[styles.storyAvatar, { borderColor: isVideo ? '#8B5CF6' : colors.primary }]}>
                     {isVideo ? (
                       <View style={styles.storyVideoPlaceholder}>
                         <Icon name="play" size={24} color="#FFFFFF" />
@@ -605,7 +1158,7 @@ export default function SocialScreen() {
                   </View>
                 ) : (
                   <View style={styles.storyModalEmpty}>
-                    <Icon name="images" size={50} color="#6B7280" />
+                    <Icon name="images" size={50} color={colors.textSecondary} />
                     <Text style={styles.storyModalEmptyText}>Sem mídia</Text>
                   </View>
                 )}
@@ -686,8 +1239,8 @@ export default function SocialScreen() {
                 style={styles.shareOption}
                 onPress={() => shareViaLink(selectedPost)}
               >
-                <View style={[styles.shareIcon, { backgroundColor: '#3B82F620' }]}>
-                  <Icon name="link" size={32} color="#3B82F6" />
+                <View style={[styles.shareIcon, { backgroundColor: colors.primary + '20' }]}>
+                  <Icon name="link" size={32} color={colors.primary} />
                 </View>
                 <Text style={styles.shareLabel}>Copiar Link</Text>
               </TouchableOpacity>
@@ -708,7 +1261,7 @@ export default function SocialScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Carregando...</Text>
       </View>
     );
@@ -718,7 +1271,7 @@ export default function SocialScreen() {
     <View style={styles.container}>
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B82F6" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
         showsVerticalScrollIndicator={false}
       >
@@ -757,7 +1310,7 @@ export default function SocialScreen() {
             <TextInput
               style={styles.postInput}
               placeholder="O que está acontecendo?"
-              placeholderTextColor="#6B7280"
+              placeholderTextColor={colors.textSecondary}
               multiline
               value={newPost.content}
               onChangeText={(text) => setNewPost({ ...newPost, content: text })}
@@ -780,7 +1333,7 @@ export default function SocialScreen() {
               {selectedVideo && (
                 <View style={styles.mediaPreview}>
                   <View style={styles.previewVideo}>
-                    <Icon name="play-circle" size={32} color="#3B82F6" />
+                    <Icon name="play-circle" size={32} color={colors.primary} />
                   </View>
                   <TouchableOpacity
                     style={styles.removeMedia}
@@ -796,7 +1349,7 @@ export default function SocialScreen() {
           <View style={styles.postActions}>
             <View style={styles.mediaButtons}>
               <TouchableOpacity onPress={handleImagePicker} disabled={uploading}>
-                <Icon name="image" size={24} color="#3B82F6" />
+                <Icon name="image" size={24} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleVideoPicker} disabled={uploading}>
                 <Icon name="videocam" size={24} color="#8B5CF6" />
@@ -862,7 +1415,7 @@ export default function SocialScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.postAction}>
-                <Icon name="chatbubble" size={20} color="#6B7280" />
+                <Icon name="chatbubble" size={20} color={colors.textSecondary} />
                 <Text style={styles.postActionText}>{post.comments}</Text>
               </TouchableOpacity>
 
@@ -870,7 +1423,7 @@ export default function SocialScreen() {
                 style={styles.postAction}
                 onPress={() => handleShare(post)}
               >
-                <Icon name="share-social" size={20} color="#3B82F6" />
+                <Icon name="share-social" size={20} color={colors.primary} />
                 <Text style={styles.postActionText}>Compartilhar</Text>
               </TouchableOpacity>
             </View>
@@ -885,556 +1438,3 @@ export default function SocialScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0D1117',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0D1117',
-  },
-  loadingText: {
-    color: '#6B7280',
-    marginTop: 8,
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  storiesContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#161B22',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#30363D',
-    marginBottom: 12,
-  },
-  storiesHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  storiesTitle: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  storiesScroll: {
-    flexDirection: 'row',
-  },
-  storyItem: {
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  storyAvatarWrapper: {
-    padding: 2,
-  },
-  storyAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 3,
-    padding: 2,
-    backgroundColor: '#161B22',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  storyRETESP: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
-    backgroundColor: '#1A1A2E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  storyRETESPText: {
-    color: '#FF4444',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  storyRETESPBadge: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    backgroundColor: '#00FF88',
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  storyRETESPBadgeText: {
-    color: '#1A1A2E',
-    fontSize: 6,
-    fontWeight: 'bold',
-  },
-  storyAvatarImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
-  },
-  storyAvatarDefault: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  storyAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  storyVideoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
-    backgroundColor: '#1E1E1E',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  storyUserName: {
-    color: '#9CA3AF',
-    fontSize: 11,
-    marginTop: 4,
-    maxWidth: 64,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#21262D',
-    marginRight: 8,
-  },
-  filterButtonActive: {
-    backgroundColor: '#3B82F6',
-  },
-  filterText: {
-    color: '#9CA3AF',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  filterTextActive: {
-    color: '#FFFFFF',
-  },
-  createPost: {
-    backgroundColor: '#161B22',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#30363D',
-  },
-  createPostHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  createPostAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  createPostAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-  },
-  postInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 15,
-    minHeight: 40,
-    paddingTop: 8,
-    textAlignVertical: 'top',
-  },
-  mediaPreviewContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginVertical: 8,
-    marginLeft: 48,
-  },
-  mediaPreview: {
-    position: 'relative',
-    width: 72,
-    height: 72,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#30363D',
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-  },
-  previewVideo: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#0D1117',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeMedia: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 12,
-  },
-  postActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#30363D',
-    marginLeft: 48,
-  },
-  mediaButtons: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  postRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  postButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 8,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  postButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  postCard: {
-    backgroundColor: '#161B22',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#30363D',
-  },
-  postHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  postAuthor: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  authorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  authorAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  authorName: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  authorTeam: {
-    color: '#6B7280',
-    fontSize: 12,
-  },
-  postDate: {
-    color: '#6B7280',
-    fontSize: 11,
-  },
-  postContent: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    marginBottom: 8,
-    lineHeight: 22,
-  },
-  postImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  videoContainer: {
-    width: '100%',
-    height: 220,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: '#000000',
-    overflow: 'hidden',
-  },
-  videoPlayer: {
-    width: '100%',
-    height: '100%',
-  },
-  videoFallback: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0D1117',
-  },
-  videoFallbackText: {
-    color: '#6B7280',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  videoLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    zIndex: 1,
-  },
-  postFooter: {
-    flexDirection: 'row',
-    gap: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#30363D',
-    paddingTop: 12,
-  },
-  postAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  postActionText: {
-    color: '#6B7280',
-    fontSize: 14,
-  },
-  footerSpacer: {
-    height: 20,
-  },
-  storyModalContainer: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  storyModalClose: {
-    position: 'absolute',
-    top: 40,
-    left: 20,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 10,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  storyModalContent: {
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
-  },
-  storyModalHeader: {
-    marginBottom: 16,
-  },
-  storyModalUser: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  storyModalRETESP: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  storyModalRETESPText: {
-    color: '#FF4444',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  storyModalRETESPBadge: {
-    backgroundColor: '#00FF88',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  storyModalRETESPBadgeText: {
-    color: '#1A1A2E',
-    fontSize: 16,
-  },
-  storyModalRETESPContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  storyModalRETESPBig: {
-    color: '#FF4444',
-    fontSize: 48,
-    fontWeight: 'bold',
-  },
-  storyModalRETESPBigSub: {
-    color: '#00FF88',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  storyModalRETESPDesc: {
-    color: '#9CA3AF',
-    fontSize: 16,
-    marginTop: 8,
-  },
-  storyModalMedia: {
-    width: '100%',
-    height: height * 0.6,
-    backgroundColor: '#161B22',
-    borderRadius: 16,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  storyModalImage: {
-    width: '100%',
-    height: '100%',
-  },
-  storyModalVideo: {
-    width: '100%',
-    height: '100%',
-  },
-  storyVideoContainer: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  storyModalEmpty: {
-    alignItems: 'center',
-  },
-  storyModalEmptyText: {
-    color: '#6B7280',
-    fontSize: 14,
-    marginTop: 8,
-  },
-  storyModalButton: {
-    marginTop: 20,
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  storyModalButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  shareModalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  shareModalContent: {
-    backgroundColor: '#161B22',
-    borderRadius: 20,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-    borderWidth: 1,
-    borderColor: '#30363D',
-  },
-  shareModalTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  shareOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  shareOption: {
-    alignItems: 'center',
-    width: 70,
-  },
-  shareIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  statusIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  statusGradient: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#8B5CF6',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    borderRadius: 16,
-  },
-  shareLabel: {
-    color: '#9CA3AF',
-    fontSize: 11,
-    textAlign: 'center',
-  },
-  shareCancelButton: {
-    marginTop: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#30363D',
-  },
-  shareCancelText: {
-    color: '#6B7280',
-    fontSize: 16,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-});

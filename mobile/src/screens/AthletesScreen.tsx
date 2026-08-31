@@ -16,6 +16,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { API_URL } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 
 interface Athlete {
   id: string;
@@ -28,6 +29,7 @@ interface Athlete {
 
 export default function AthletesScreen() {
   const navigation = useNavigation();
+  const { colors, isDark } = useTheme();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [filteredAthletes, setFilteredAthletes] = useState<Athlete[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,389 @@ export default function AthletesScreen() {
   const [athleteToDelete, setAthleteToDelete] = useState<string | null>(null);
 
   const categories = ['all', 'Sub-10', 'Sub-12', 'Sub-14', 'Sub-16', 'Sub-18', 'Sub-20'];
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 8,
+      backgroundColor: colors.background,
+    },
+    headerTitle: {
+      color: colors.text,
+      fontSize: 24,
+      fontWeight: 'bold',
+    },
+    createButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 4,
+    },
+    createButtonText: {
+      color: colors.primary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+      marginTop: 12,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      marginHorizontal: 16,
+      marginTop: 8,
+      marginBottom: 8,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    searchIcon: {
+      marginRight: 8,
+    },
+    searchInput: {
+      flex: 1,
+      color: colors.text,
+      paddingVertical: 10,
+      fontSize: 16,
+    },
+    categoriesContainer: {
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+    },
+    categoryButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      borderRadius: 20,
+      backgroundColor: colors.hover,
+      marginRight: 8,
+    },
+    categoryButtonActive: {
+      backgroundColor: colors.primary,
+    },
+    categoryText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '500',
+    },
+    categoryTextActive: {
+      color: '#FFFFFF',
+    },
+    listContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 20,
+    },
+    athleteCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 12,
+      overflow: 'hidden',
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+    },
+    athleteAvatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+      overflow: 'hidden',
+    },
+    avatarImage: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+    },
+    avatarText: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    athleteInfo: {
+      flex: 1,
+    },
+    athleteName: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    athleteCategory: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    expandedContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: 12,
+    },
+    detailRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+      gap: 8,
+    },
+    detailText: {
+      color: colors.text,
+      fontSize: 14,
+    },
+    linkText: {
+      color: '#10B981',
+    },
+    actionButtons: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 12,
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      borderRadius: 8,
+      gap: 4,
+    },
+    actionButtonPrimary: {
+      backgroundColor: colors.primary,
+    },
+    actionButtonEdit: {
+      backgroundColor: '#8B5CF6',
+    },
+    actionButtonDanger: {
+      backgroundColor: '#EF4444',
+    },
+    actionButtonText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 60,
+    },
+    emptyText: {
+      color: colors.textSecondary,
+      fontSize: 16,
+      marginTop: 12,
+    },
+    emptyButton: {
+      marginTop: 16,
+      backgroundColor: colors.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 8,
+    },
+    emptyButtonText: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      width: '100%',
+      maxHeight: '90%',
+      padding: 20,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingBottom: 12,
+    },
+    modalTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    modalAvatarContainer: {
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    modalAvatar: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    modalAvatarPlaceholder: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalAvatarText: {
+      color: '#FFFFFF',
+      fontSize: 40,
+      fontWeight: 'bold',
+    },
+    modalName: {
+      color: colors.text,
+      fontSize: 24,
+      fontWeight: 'bold',
+      textAlign: 'center',
+    },
+    modalCategory: {
+      color: colors.textSecondary,
+      fontSize: 16,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    modalInfoContainer: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+    },
+    modalInfoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 12,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    modalInfoLabel: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    modalInfoValue: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    modalActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    modalActionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 10,
+      gap: 6,
+    },
+    modalActionAttendance: {
+      backgroundColor: colors.primary,
+    },
+    modalActionEdit: {
+      backgroundColor: '#8B5CF6',
+    },
+    modalActionDanger: {
+      backgroundColor: '#EF4444',
+    },
+    modalActionText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    deleteModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    deleteModalContent: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 24,
+      alignItems: 'center',
+      width: '100%',
+    },
+    deleteModalTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginTop: 12,
+    },
+    deleteModalText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      textAlign: 'center',
+      marginTop: 8,
+      marginBottom: 20,
+    },
+    deleteModalButtons: {
+      flexDirection: 'row',
+      gap: 12,
+      width: '100%',
+    },
+    deleteModalButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    deleteModalCancel: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    deleteModalCancelText: {
+      color: colors.textSecondary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    deleteModalConfirm: {
+      backgroundColor: '#EF4444',
+    },
+    deleteModalConfirmText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });
 
   const fetchAthletes = async () => {
     try {
@@ -108,6 +493,12 @@ export default function AthletesScreen() {
     navigation.navigate('CreateAthlete');
   };
 
+  const navigateToAttendance = (athleteId: string) => {
+    setModalVisible(false);
+    // @ts-ignore
+    navigation.navigate('AthleteDetails', { id: athleteId });
+  };
+
   const confirmDelete = (id: string) => {
     setAthleteToDelete(id);
     setDeleteModalVisible(true);
@@ -152,11 +543,8 @@ export default function AthletesScreen() {
 
   const getAvatarUrl = (avatar_url: string | null) => {
     if (!avatar_url) return null;
-    // Se já começa com http, retorna direto
     if (avatar_url.startsWith('http')) return avatar_url;
-    // Se começa com /, concatena com API_URL
     if (avatar_url.startsWith('/')) return `${API_URL}${avatar_url}`;
-    // Caso contrário, adiciona a barra
     return `${API_URL}/${avatar_url}`;
   };
 
@@ -192,25 +580,25 @@ export default function AthletesScreen() {
           <Icon
             name={isExpanded ? 'chevron-up' : 'chevron-down'}
             size={24}
-            color="#6B7280"
+            color={colors.textSecondary}
           />
         </TouchableOpacity>
 
         {isExpanded && (
           <View style={styles.expandedContent}>
             <View style={styles.detailRow}>
-              <Icon name="calendar-outline" size={20} color="#6B7280" />
+              <Icon name="calendar-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.detailText}>
                 Nascimento: {formatDate(item.birth_date)} ({age} anos)
               </Text>
             </View>
             <View style={styles.detailRow}>
-              <Icon name="pricetag-outline" size={20} color="#6B7280" />
+              <Icon name="pricetag-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.detailText}>Categoria: {item.category}</Text>
             </View>
             {item.medical_form_url && (
               <View style={styles.detailRow}>
-                <Icon name="document-text-outline" size={20} color="#6B7280" />
+                <Icon name="document-text-outline" size={20} color={colors.textSecondary} />
                 <Text style={[styles.detailText, styles.linkText]}>
                   Ficha Médica: Disponível
                 </Text>
@@ -251,7 +639,7 @@ export default function AthletesScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Carregando atletas...</Text>
       </View>
     );
@@ -262,23 +650,23 @@ export default function AthletesScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Atletas</Text>
         <TouchableOpacity style={styles.createButton} onPress={navigateToCreate}>
-          <Icon name="add-circle" size={24} color="#3B82F6" />
+          <Icon name="add-circle" size={24} color={colors.primary} />
           <Text style={styles.createButtonText}>Novo</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
-        <Icon name="search" size={20} color="#6B7280" style={styles.searchIcon} />
+        <Icon name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar atleta..."
-          placeholderTextColor="#6B7280"
+          placeholderTextColor={colors.textSecondary}
           value={searchTerm}
           onChangeText={setSearchTerm}
         />
         {searchTerm !== '' && (
           <TouchableOpacity onPress={() => setSearchTerm('')}>
-            <Icon name="close-circle" size={20} color="#6B7280" />
+            <Icon name="close-circle" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -315,11 +703,11 @@ export default function AthletesScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderAthlete}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B82F6" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Icon name="people-outline" size={60} color="#6B7280" />
+            <Icon name="people-outline" size={60} color={colors.textSecondary} />
             <Text style={styles.emptyText}>Nenhum atleta encontrado</Text>
             <TouchableOpacity style={styles.emptyButton} onPress={navigateToCreate}>
               <Text style={styles.emptyButtonText}>Criar primeiro atleta</Text>
@@ -341,7 +729,7 @@ export default function AthletesScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Detalhes do Atleta</Text>
               <TouchableOpacity onPress={closeDetails}>
-                <Icon name="close" size={28} color="#FFFFFF" />
+                <Icon name="close" size={28} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -367,7 +755,7 @@ export default function AthletesScreen() {
 
                 <View style={styles.modalInfoContainer}>
                   <View style={styles.modalInfoRow}>
-                    <Icon name="calendar-outline" size={22} color="#3B82F6" />
+                    <Icon name="calendar-outline" size={22} color={colors.primary} />
                     <View>
                       <Text style={styles.modalInfoLabel}>Data de Nascimento</Text>
                       <Text style={styles.modalInfoValue}>
@@ -377,7 +765,7 @@ export default function AthletesScreen() {
                   </View>
 
                   <View style={styles.modalInfoRow}>
-                    <Icon name="person-outline" size={22} color="#3B82F6" />
+                    <Icon name="person-outline" size={22} color={colors.primary} />
                     <View>
                       <Text style={styles.modalInfoLabel}>Idade</Text>
                       <Text style={styles.modalInfoValue}>
@@ -387,7 +775,7 @@ export default function AthletesScreen() {
                   </View>
 
                   <View style={styles.modalInfoRow}>
-                    <Icon name="pricetag-outline" size={22} color="#3B82F6" />
+                    <Icon name="pricetag-outline" size={22} color={colors.primary} />
                     <View>
                       <Text style={styles.modalInfoLabel}>Categoria</Text>
                       <Text style={styles.modalInfoValue}>
@@ -397,7 +785,7 @@ export default function AthletesScreen() {
                   </View>
 
                   {selectedAthlete.medical_form_url && (
-                    <View style={styles.modalInfoRow}>
+                    <View style={[styles.modalInfoRow, { borderBottomWidth: 0 }]}>
                       <Icon name="document-text-outline" size={22} color="#10B981" />
                       <View>
                         <Text style={styles.modalInfoLabel}>Ficha Médica</Text>
@@ -409,7 +797,16 @@ export default function AthletesScreen() {
                   )}
                 </View>
 
+                {/* Botões de Ação do Modal */}
                 <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.modalActionButton, styles.modalActionAttendance]}
+                    onPress={() => navigateToAttendance(selectedAthlete.id)}
+                  >
+                    <Icon name="calendar" size={20} color="#FFFFFF" />
+                    <Text style={styles.modalActionText}>Ver Presenças</Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     style={[styles.modalActionButton, styles.modalActionEdit]}
                     onPress={() => {
@@ -472,383 +869,3 @@ export default function AthletesScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0D1117',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    backgroundColor: '#0D1117',
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#161B22',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#30363D',
-    gap: 4,
-  },
-  createButtonText: {
-    color: '#3B82F6',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0D1117',
-  },
-  loadingText: {
-    color: '#6B7280',
-    marginTop: 12,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#161B22',
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#30363D',
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    paddingVertical: 10,
-    fontSize: 16,
-  },
-  categoriesContainer: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  categoryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#21262D',
-    marginRight: 8,
-  },
-  categoryButtonActive: {
-    backgroundColor: '#3B82F6',
-  },
-  categoryText: {
-    color: '#6B7280',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  categoryTextActive: {
-    color: '#FFFFFF',
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
-  athleteCard: {
-    backgroundColor: '#161B22',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#30363D',
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-  },
-  athleteAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  athleteInfo: {
-    flex: 1,
-  },
-  athleteName: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  athleteCategory: {
-    color: '#6B7280',
-    fontSize: 12,
-  },
-  expandedContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#30363D',
-    paddingTop: 12,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-  detailText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-  },
-  linkText: {
-    color: '#10B981',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 4,
-  },
-  actionButtonPrimary: {
-    backgroundColor: '#3B82F6',
-  },
-  actionButtonEdit: {
-    backgroundColor: '#8B5CF6',
-  },
-  actionButtonDanger: {
-    backgroundColor: '#EF4444',
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    color: '#6B7280',
-    fontSize: 16,
-    marginTop: 12,
-  },
-  emptyButton: {
-    marginTop: 16,
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  emptyButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#161B22',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#30363D',
-    width: '100%',
-    maxHeight: '90%',
-    padding: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#30363D',
-    paddingBottom: 12,
-  },
-  modalTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  modalAvatarContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalAvatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-  },
-  modalAvatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 40,
-    fontWeight: 'bold',
-  },
-  modalName: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  modalCategory: {
-    color: '#6B7280',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  modalInfoContainer: {
-    backgroundColor: '#0D1117',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  modalInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1C2128',
-  },
-  modalInfoLabel: {
-    color: '#6B7280',
-    fontSize: 12,
-  },
-  modalInfoValue: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalActionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-  },
-  modalActionEdit: {
-    backgroundColor: '#8B5CF6',
-  },
-  modalActionDanger: {
-    backgroundColor: '#EF4444',
-  },
-  modalActionText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  deleteModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  deleteModalContent: {
-    backgroundColor: '#161B22',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#30363D',
-    padding: 24,
-    alignItems: 'center',
-    width: '100%',
-  },
-  deleteModalTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 12,
-  },
-  deleteModalText: {
-    color: '#6B7280',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  deleteModalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  deleteModalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  deleteModalCancel: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#30363D',
-  },
-  deleteModalCancelText: {
-    color: '#6B7280',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  deleteModalConfirm: {
-    backgroundColor: '#EF4444',
-  },
-  deleteModalConfirmText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});

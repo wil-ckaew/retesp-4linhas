@@ -9,9 +9,9 @@ interface LogoProps {
 export default function Logo({ size = 'medium', showText = true }: LogoProps) {
   const getSize = () => {
     switch (size) {
-      case 'small': return { width: 30, height: 30, fontSize: 12 };
-      case 'large': return { width: 50, height: 50, fontSize: 20 };
-      default: return { width: 40, height: 40, fontSize: 16 };
+      case 'small': return { width: 30, height: 30 };
+      case 'large': return { width: 56, height: 56 };
+      default: return { width: 44, height: 44 };
     }
   };
 
@@ -24,24 +24,25 @@ export default function Logo({ size = 'medium', showText = true }: LogoProps) {
         { 
           width: sizeStyle.width, 
           height: sizeStyle.height,
-          borderRadius: sizeStyle.width / 4,
+          borderRadius: sizeStyle.width / 2,
+          overflow: 'hidden',
         }
       ]}>
         <Image 
-          source={require('../../assets/logo.png')} 
+          source={require('../../assets/logo.png')}
           style={{ 
-            width: sizeStyle.width - 8, 
-            height: sizeStyle.height - 8,
+            width: sizeStyle.width - 4, 
+            height: sizeStyle.height - 4,
           }}
           resizeMode="contain"
         />
       </View>
       {showText && (
         <View style={styles.textContainer}>
-          <Text style={[styles.logoTitle, { fontSize: sizeStyle.fontSize + 4 }]}>
+          <Text style={[styles.logoTitle, { fontSize: sizeStyle.width / 2.5 }]}>
             RETESP
           </Text>
-          <Text style={[styles.logoSubtitle, { fontSize: sizeStyle.fontSize - 4 }]}>
+          <Text style={[styles.logoSubtitle, { fontSize: sizeStyle.width / 4 }]}>
             4 Linhas
           </Text>
         </View>
@@ -62,8 +63,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#30363D',
-    overflow: 'hidden',
-    padding: 4,
   },
   textContainer: {
     flexDirection: 'column',

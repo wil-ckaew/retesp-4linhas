@@ -5,20 +5,73 @@
 :root {
   --background: #0a0a0a;
   --foreground: #ededed;
-}
-body {
-  color: var(--foreground);
-  background: var(--background);
+  --bg-primary: #0D1117;
+  --bg-card: #161B22;
+  --border-color: #30363D;
+  --text-primary: #FFFFFF;
+  --text-secondary: #9CA3AF;
+  --bg-input: #0D1117;
+  --bg-hover: #21262D;
 }
 
-/* Scrollbar personalizada para dark mode */
-::-webkit-scrollbar {
-  width: 8px;
+/* TEMA CLARO - Cinza clarinho e suave */
+.light {
+  --bg-primary: #f0f2f5;
+  --bg-card: #ffffff;
+  --border-color: #d1d5db;
+  --text-primary: #1a1a2e;
+  --text-secondary: #6b7280;
+  --bg-input: #f8f9fa;
+  --bg-hover: #e5e7eb;
 }
-::-webkit-scrollbar-track {
-  background: #161B22;
+
+/* TEMA ESCURO - Original */
+.dark {
+  --bg-primary: #0D1117;
+  --bg-card: #161B22;
+  --border-color: #30363D;
+  --text-primary: #FFFFFF;
+  --text-secondary: #9CA3AF;
+  --bg-input: #0D1117;
+  --bg-hover: #21262D;
 }
-::-webkit-scrollbar-thumb {
-  background: #30363D;
-  border-radius: 4px;
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+/* Classes de utilidade */
+.bg-app { background-color: var(--bg-primary); }
+.bg-card { background-color: var(--bg-card); }
+.bg-input { background-color: var(--bg-input); }
+.border-card { border-color: var(--border-color); }
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.hover-bg { background-color: var(--bg-hover); }
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-card); }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+/* Ajustes para o tema claro */
+.light .shadow-card {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.light input,
+.light textarea,
+.light select {
+  background-color: var(--bg-input);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.light input:focus,
+.light textarea:focus,
+.light select:focus {
+  border-color: #4ade80;
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
 }

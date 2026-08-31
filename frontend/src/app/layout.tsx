@@ -21,13 +21,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className="dark">
-      <body className={`${inter.className} bg-[#0D1117] text-white min-h-screen flex`}>
+      <body className={`${inter.className} bg-app text-primary min-h-screen flex`}>
         <Sidebar />
         <main className="flex-1 ml-72 min-h-screen">
-          {/* Header com o logo real */}
-          <header className="bg-[#161B22] border-b border-[#30363D] px-6 py-3 flex items-center justify-between">
+          <header className="bg-card border-b border-card px-6 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl overflow-hidden bg-[#161B22] border border-[#30363D] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-card border border-card flex items-center justify-center">
                 <Image 
                   src="/images/logo.jpeg" 
                   alt="RETESP 4L" 
@@ -46,8 +45,8 @@ export default function RootLayout({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-500">Administrador</span>
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
+              <span className="text-xs text-secondary">Administrador</span>
+              <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-sm">
                 A
               </div>
             </div>

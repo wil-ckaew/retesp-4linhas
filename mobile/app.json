@@ -23,7 +23,10 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-build-properties"
+      "expo-build-properties",
+      "expo-video",
+      "expo-image",
+      "expo-sharing"
     ]
   }
 }

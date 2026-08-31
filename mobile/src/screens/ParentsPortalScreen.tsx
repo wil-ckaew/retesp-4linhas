@@ -1,4 +1,3 @@
-// frontend/mobile/src/screens/ParentsPortalScreen.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -20,9 +19,11 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { API_URL } from '../services/api';
 import * as ImagePicker from 'expo-image-picker';
+import { Video, ResizeMode } from 'expo-av';
+import { useTheme } from '../context/ThemeContext';
 
-// Verificar se está na web
 const isWeb = Platform.OS === 'web';
+const { width, height } = Dimensions.get('window');
 
 interface Athlete {
   id: string;
@@ -49,9 +50,8 @@ interface Media {
   athlete_name: string;
 }
 
-const { width, height } = Dimensions.get('window');
-
 export default function ParentsPortalScreen() {
+  const { colors, isDark } = useTheme();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [selectedAthlete, setSelectedAthlete] = useState<Athlete | null>(null);
   const [summary, setSummary] = useState<AthleteSummary | null>(null);
@@ -60,7 +60,7 @@ export default function ParentsPortalScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showMedia, setShowMedia] = useState(false);
-  const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState<number>(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -68,6 +68,457 @@ export default function ParentsPortalScreen() {
   const [newName, setNewName] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const videoRefs = useRef<{ [key: string]: any }>({});
+  const flatListRef = useRef<FlatList>(null);
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      paddingHorizontal: 16,
+      paddingTop: 16,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+      marginTop: 8,
+    },
+    header: {
+      marginBottom: 20,
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    headerSubtitle: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 16,
+    },
+    searchIcon: {
+      marginRight: 8,
+    },
+    searchInput: {
+      flex: 1,
+      color: colors.text,
+      paddingVertical: 10,
+      fontSize: 15,
+    },
+    sectionTitle: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 12,
+    },
+    athleteCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      padding: 12,
+      borderRadius: 12,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    athleteCardSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + '15',
+    },
+    athleteAvatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+      overflow: 'hidden',
+    },
+    avatarImage: {
+      width: 44,
+      height: 44,
+    },
+    avatarText: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    athleteInfo: {
+      flex: 1,
+    },
+    athleteName: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    athleteCategory: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    summaryContainer: {
+      marginTop: 20,
+      marginBottom: 20,
+    },
+    summaryTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginBottom: 12,
+    },
+    summaryCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    summaryLabel: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    summaryValue: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    uploadContainer: {
+      marginVertical: 16,
+    },
+    uploadButton: {
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      borderRadius: 12,
+      gap: 8,
+    },
+    uploadButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    progressContainer: {
+      marginTop: 12,
+    },
+    progressHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 4,
+    },
+    progressLabel: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    progressPercent: {
+      color: colors.primary,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    progressBar: {
+      height: 6,
+      backgroundColor: colors.hover,
+      borderRadius: 3,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      backgroundColor: colors.primary,
+      borderRadius: 3,
+    },
+    mediaContainer: {
+      marginBottom: 20,
+    },
+    mediaTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginBottom: 12,
+    },
+    mediaGrid: {
+      paddingBottom: 8,
+    },
+    mediaItem: {
+      width: (width - 48) / 3,
+      aspectRatio: 1,
+      backgroundColor: colors.card,
+      borderRadius: 8,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginRight: 8,
+      marginBottom: 8,
+      position: 'relative',
+    },
+    mediaImage: {
+      width: '100%',
+      height: '100%',
+    },
+    videoPreviewContainer: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: '#000000',
+      justifyContent: 'center',
+      alignItems: 'center',
+      position: 'relative',
+    },
+    videoPreview: {
+      width: '100%',
+      height: '100%',
+    },
+    videoPlayOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.3)',
+    },
+    videoBadge: {
+      position: 'absolute',
+      top: 4,
+      left: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      gap: 2,
+    },
+    videoBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 8,
+      fontWeight: '500',
+    },
+    mediaOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 4,
+    },
+    mediaDate: {
+      color: '#D1D5DB',
+      fontSize: 9,
+      textAlign: 'center',
+    },
+    mediaActions: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      flexDirection: 'row',
+      gap: 4,
+    },
+    editButton: {
+      backgroundColor: 'rgba(59, 130, 246, 0.8)',
+      padding: 4,
+      borderRadius: 12,
+    },
+    deleteButton: {
+      backgroundColor: 'rgba(239, 68, 68, 0.8)',
+      padding: 4,
+      borderRadius: 12,
+    },
+    editModal: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.85)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 16,
+    },
+    editModalContent: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      width: '100%',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    editInput: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 12,
+      color: colors.text,
+      fontSize: 16,
+      marginBottom: 12,
+    },
+    editModalActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    saveButton: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      paddingVertical: 10,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    saveButtonText: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+    },
+    cancelEditButton: {
+      flex: 1,
+      backgroundColor: colors.hover,
+      paddingVertical: 10,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    cancelEditText: {
+      color: colors.textSecondary,
+      fontWeight: '600',
+    },
+    noMediaContainer: {
+      alignItems: 'center',
+      paddingVertical: 30,
+    },
+    noMediaText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      marginTop: 8,
+    },
+    noMediaSubtext: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    fullscreenContainer: {
+      flex: 1,
+      backgroundColor: '#000000',
+    },
+    closeButton: {
+      position: 'absolute',
+      top: 40,
+      left: 20,
+      zIndex: 20,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      padding: 12,
+      borderRadius: 30,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
+    deleteButtonModal: {
+      position: 'absolute',
+      top: 40,
+      right: 20,
+      zIndex: 20,
+      backgroundColor: 'rgba(239, 68, 68, 0.2)',
+      padding: 12,
+      borderRadius: 30,
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.3)',
+    },
+    positionIndicator: {
+      position: 'absolute',
+      top: 40,
+      right: 80,
+      zIndex: 20,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
+    positionText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    modalMediaContainer: {
+      width: width,
+      height: height,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: '#000000',
+    },
+    fullscreenImage: {
+      width: width,
+      height: height * 0.8,
+      backgroundColor: '#000000',
+    },
+    fullscreenVideo: {
+      width: width,
+      height: height * 0.85,
+      backgroundColor: '#000000',
+    },
+    videoOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      padding: 20,
+      paddingBottom: 40,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+    },
+    videoInfoOverlay: {
+      flex: 1,
+    },
+    videoTitleOverlay: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginBottom: 4,
+    },
+    videoDateOverlay: {
+      color: '#9CA3AF',
+      fontSize: 14,
+    },
+    navigationDots: {
+      position: 'absolute',
+      bottom: 100,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: '100%',
+      zIndex: 20,
+    },
+    navDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: 'rgba(255,255,255,0.3)',
+      marginHorizontal: 4,
+    },
+    navDotActive: {
+      backgroundColor: colors.primary,
+      width: 12,
+      height: 8,
+    },
+  });
 
   const fetchAthletes = async () => {
     try {
@@ -131,7 +582,6 @@ export default function ParentsPortalScreen() {
     setLoading(false);
   };
 
-  // Função para selecionar arquivo - Web
   const handleWebFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -146,7 +596,6 @@ export default function ParentsPortalScreen() {
     handleUpload(fileData);
   };
 
-  // Função para selecionar arquivo - Mobile
   const handleMobileFileSelect = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -171,7 +620,6 @@ export default function ParentsPortalScreen() {
     }
   };
 
-  // Função principal de upload
   const handleUpload = async (file: any) => {
     if (!selectedAthlete) {
       Alert.alert('Erro', 'Selecione um atleta primeiro');
@@ -185,10 +633,8 @@ export default function ParentsPortalScreen() {
       const formData = new FormData();
 
       if (isWeb && file.file) {
-        // Para web
         formData.append('file', file.file);
       } else {
-        // Para mobile
         const fileData = {
           uri: file.uri,
           type: file.type || 'image/jpeg',
@@ -229,11 +675,8 @@ export default function ParentsPortalScreen() {
       await uploadPromise;
       
       Alert.alert('Sucesso', 'Arquivo enviado com sucesso!');
-      
-      // Recarregar lista
       await fetchAthleteMedia(selectedAthlete.id);
       
-      // Limpar input file web
       if (isWeb && fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -247,7 +690,6 @@ export default function ParentsPortalScreen() {
     }
   };
 
-  // Função para excluir mídia
   const deleteMedia = async (id: string, fileName: string) => {
     Alert.alert(
       'Confirmar Exclusão',
@@ -262,6 +704,9 @@ export default function ParentsPortalScreen() {
               const res = await fetch(`${API_URL}/media/${id}`, { method: 'DELETE' });
               if (res.ok) {
                 Alert.alert('Sucesso', 'Arquivo excluído com sucesso!');
+                if (modalVisible) {
+                  closeModal();
+                }
                 if (selectedAthlete) {
                   await fetchAthleteMedia(selectedAthlete.id);
                 }
@@ -279,7 +724,6 @@ export default function ParentsPortalScreen() {
     );
   };
 
-  // Função para renomear mídia
   const renameMedia = async (id: string) => {
     if (!newName.trim()) {
       Alert.alert('Erro', 'Digite um novo nome');
@@ -323,94 +767,201 @@ export default function ParentsPortalScreen() {
     });
   };
 
-  const renderMediaItem = ({ item }: { item: Media }) => (
-    <TouchableOpacity
-      style={styles.mediaItem}
-      onPress={() => {
-        setSelectedMedia(item);
-        setModalVisible(true);
-      }}
-      activeOpacity={0.9}
-    >
-      {item.media_type === 'photo' ? (
-        <Image
-          source={{ uri: `${API_URL}${item.file_url}` }}
-          style={styles.mediaImage}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={styles.videoPlaceholder}>
-          <Icon name="play-circle" size={32} color="#3B82F6" />
-          <Text style={styles.videoText}>Vídeo</Text>
-        </View>
-      )}
-      
-      <View style={styles.mediaOverlay}>
-        <Text style={styles.mediaDate}>{formatDate(item.uploaded_at)}</Text>
-      </View>
+  const openMediaModal = (index: number) => {
+    setSelectedMediaIndex(index);
+    setModalVisible(true);
+  };
 
-      {/* Botões de Editar e Excluir */}
-      <View style={styles.mediaActions}>
-        <TouchableOpacity 
-          onPress={() => {
-            const fileName = item.file_url.split('/').pop() || 'arquivo';
-            setEditingId(item.id);
-            setNewName(fileName.replace(/\.[^/.]+$/, ""));
-          }}
-          style={styles.editButton}
-        >
-          <Icon name="create-outline" size={16} color="#FFFFFF" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={() => {
-            const fileName = item.file_url.split('/').pop() || 'arquivo';
-            deleteMedia(item.id, fileName);
-          }}
-          style={styles.deleteButton}
-        >
-          <Icon name="trash-outline" size={16} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+  const closeModal = () => {
+    setModalVisible(false);
+    Object.keys(videoRefs.current).forEach((key) => {
+      if (videoRefs.current[key]) {
+        videoRefs.current[key].pauseAsync();
+      }
+    });
+    StatusBar.setHidden(false);
+  };
 
-      {/* Modal de Renomear */}
-      {editingId === item.id && (
-        <View style={styles.editModal}>
-          <View style={styles.editModalContent}>
-            <TextInput 
-              style={styles.editInput}
-              value={newName}
-              onChangeText={setNewName}
-              placeholder="Novo nome"
-              placeholderTextColor="#6B7280"
-              autoFocus
+  const goToNext = () => {
+    if (selectedMediaIndex < media.length - 1) {
+      const currentId = media[selectedMediaIndex]?.id;
+      if (currentId && videoRefs.current[currentId]) {
+        videoRefs.current[currentId].pauseAsync();
+      }
+      setSelectedMediaIndex(selectedMediaIndex + 1);
+      flatListRef.current?.scrollToIndex({
+        index: selectedMediaIndex + 1,
+        animated: true,
+      });
+    }
+  };
+
+  const goToPrevious = () => {
+    if (selectedMediaIndex > 0) {
+      const currentId = media[selectedMediaIndex]?.id;
+      if (currentId && videoRefs.current[currentId]) {
+        videoRefs.current[currentId].pauseAsync();
+      }
+      setSelectedMediaIndex(selectedMediaIndex - 1);
+      flatListRef.current?.scrollToIndex({
+        index: selectedMediaIndex - 1,
+        animated: true,
+      });
+    }
+  };
+
+  const deleteFromModal = () => {
+    const item = media[selectedMediaIndex];
+    if (item) {
+      const fileName = item.file_url.split('/').pop() || 'arquivo';
+      deleteMedia(item.id, fileName);
+    }
+  };
+
+  const MediaItem = ({ item, index }: { item: Media; index: number }) => {
+    const isVideo = item.media_type === 'video' || item.file_url.match(/\.(mp4|mov|avi|webm)$/i);
+    const mediaUrl = `${API_URL}${item.file_url}`;
+
+    return (
+      <TouchableOpacity
+        style={styles.mediaItem}
+        onPress={() => openMediaModal(index)}
+        activeOpacity={0.9}
+      >
+        {isVideo ? (
+          <View style={styles.videoPreviewContainer}>
+            <Video
+              source={{ uri: mediaUrl }}
+              style={styles.videoPreview}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay={false}
+              isLooping={false}
+              useNativeControls={false}
             />
-            <View style={styles.editModalActions}>
-              <TouchableOpacity 
-                onPress={() => renameMedia(item.id)}
-                style={styles.saveButton}
-              >
-                <Text style={styles.saveButtonText}>Salvar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => {
-                  setEditingId(null);
-                  setNewName("");
-                }}
-                style={styles.cancelEditButton}
-              >
-                <Text style={styles.cancelEditText}>Cancelar</Text>
-              </TouchableOpacity>
+            <View style={styles.videoPlayOverlay}>
+              <Icon name="play-circle" size={40} color={colors.primary} />
+            </View>
+            <View style={styles.videoBadge}>
+              <Icon name="videocam" size={12} color="#FFFFFF" />
+              <Text style={styles.videoBadgeText}>Vídeo</Text>
             </View>
           </View>
+        ) : (
+          <Image
+            source={{ uri: mediaUrl }}
+            style={styles.mediaImage}
+            resizeMode="cover"
+          />
+        )}
+        
+        <View style={styles.mediaOverlay}>
+          <Text style={styles.mediaDate}>{formatDate(item.uploaded_at)}</Text>
         </View>
-      )}
-    </TouchableOpacity>
-  );
+
+        <View style={styles.mediaActions}>
+          <TouchableOpacity 
+            onPress={() => {
+              const fileName = item.file_url.split('/').pop() || 'arquivo';
+              setEditingId(item.id);
+              setNewName(fileName.replace(/\.[^/.]+$/, ""));
+            }}
+            style={styles.editButton}
+          >
+            <Icon name="create-outline" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => {
+              const fileName = item.file_url.split('/').pop() || 'arquivo';
+              deleteMedia(item.id, fileName);
+            }}
+            style={styles.deleteButton}
+          >
+            <Icon name="trash-outline" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        {editingId === item.id && (
+          <View style={styles.editModal}>
+            <View style={styles.editModalContent}>
+              <TextInput 
+                style={styles.editInput}
+                value={newName}
+                onChangeText={setNewName}
+                placeholder="Novo nome"
+                placeholderTextColor={colors.textSecondary}
+                autoFocus
+              />
+              <View style={styles.editModalActions}>
+                <TouchableOpacity 
+                  onPress={() => renameMedia(item.id)}
+                  style={styles.saveButton}
+                >
+                  <Text style={styles.saveButtonText}>Salvar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => {
+                    setEditingId(null);
+                    setNewName("");
+                  }}
+                  style={styles.cancelEditButton}
+                >
+                  <Text style={styles.cancelEditText}>Cancelar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderModalItem = ({ item }: { item: Media }) => {
+    const isVideo = item.media_type === 'video' || item.file_url.match(/\.(mp4|mov|avi|webm)$/i);
+    const mediaUrl = `${API_URL}${item.file_url}`;
+
+    return (
+      <View style={styles.modalMediaContainer}>
+        {isVideo ? (
+          <Video
+            ref={(ref) => {
+              if (ref) {
+                videoRefs.current[item.id] = ref;
+              }
+            }}
+            source={{ uri: mediaUrl }}
+            style={styles.fullscreenVideo}
+            resizeMode={ResizeMode.CONTAIN}
+            shouldPlay={true}
+            useNativeControls={true}
+            isLooping={false}
+            onError={(e) => console.error('Erro no vídeo:', e)}
+          />
+        ) : (
+          <Image
+            source={{ uri: mediaUrl }}
+            style={styles.fullscreenImage}
+            resizeMode="contain"
+          />
+        )}
+        
+        <View style={styles.videoOverlay}>
+          <View style={styles.videoInfoOverlay}>
+            <Text style={styles.videoTitleOverlay}>
+              {item.athlete_name || 'Mídia'}
+            </Text>
+            <Text style={styles.videoDateOverlay}>
+              {formatDate(item.uploaded_at)}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Carregando...</Text>
       </View>
     );
@@ -420,7 +971,7 @@ export default function ParentsPortalScreen() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B82F6" />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
       }
     >
       <View style={styles.header}>
@@ -429,11 +980,11 @@ export default function ParentsPortalScreen() {
       </View>
 
       <View style={styles.searchContainer}>
-        <Icon name="search" size={20} color="#6B7280" style={styles.searchIcon} />
+        <Icon name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar atleta..."
-          placeholderTextColor="#6B7280"
+          placeholderTextColor={colors.textSecondary}
           value={searchTerm}
           onChangeText={setSearchTerm}
         />
@@ -486,7 +1037,7 @@ export default function ParentsPortalScreen() {
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>📊 Frequência</Text>
-              <Text style={[styles.summaryValue, { color: '#3B82F6' }]}>
+              <Text style={[styles.summaryValue, { color: colors.primary }]}>
                 {summary.frequency.toFixed(0)}%
               </Text>
             </View>
@@ -503,7 +1054,6 @@ export default function ParentsPortalScreen() {
       {selectedAthlete && (
         <View style={styles.uploadContainer}>
           {isWeb ? (
-            // Upload para Web
             <>
               <TouchableOpacity
                 style={styles.uploadButton}
@@ -524,7 +1074,6 @@ export default function ParentsPortalScreen() {
               />
             </>
           ) : (
-            // Upload para Mobile
             <TouchableOpacity
               style={styles.uploadButton}
               onPress={handleMobileFileSelect}
@@ -557,7 +1106,7 @@ export default function ParentsPortalScreen() {
           <FlatList
             data={media}
             keyExtractor={(item) => item.id}
-            renderItem={renderMediaItem}
+            renderItem={({ item, index }) => <MediaItem item={item} index={index} />}
             numColumns={3}
             scrollEnabled={false}
             contentContainerStyle={styles.mediaGrid}
@@ -567,7 +1116,7 @@ export default function ParentsPortalScreen() {
 
       {showMedia && media.length === 0 && (
         <View style={styles.noMediaContainer}>
-          <Icon name="images-outline" size={40} color="#6B7280" />
+          <Icon name="images-outline" size={40} color={colors.textSecondary} />
           <Text style={styles.noMediaText}>Nenhuma mídia encontrada para este atleta</Text>
           <Text style={styles.noMediaSubtext}>Clique em "Fazer Upload" para adicionar</Text>
         </View>
@@ -578,441 +1127,74 @@ export default function ParentsPortalScreen() {
         visible={modalVisible}
         transparent={false}
         animationType="slide"
-        onRequestClose={() => {
-          setModalVisible(false);
-          StatusBar.setHidden(false);
-        }}
+        onRequestClose={closeModal}
         statusBarTranslucent={true}
       >
         <StatusBar hidden={true} />
         <View style={styles.fullscreenContainer}>
           <TouchableOpacity
             style={styles.closeButton}
-            onPress={() => {
-              setModalVisible(false);
-              StatusBar.setHidden(false);
-            }}
+            onPress={closeModal}
           >
             <Icon name="close" size={30} color="#FFFFFF" />
           </TouchableOpacity>
 
-          {selectedMedia && (
-            <View style={styles.videoWrapper}>
-              {selectedMedia.media_type === 'photo' ? (
-                <Image
-                  source={{ uri: `${API_URL}${selectedMedia.file_url}` }}
-                  style={styles.fullscreenImage}
-                  resizeMode="contain"
-                />
-              ) : (
-                <View style={styles.videoContainer}>
-                  <Icon name="videocam" size={50} color="#6B7280" />
-                  <Text style={styles.videoPlaceholderText}>Vídeo: {selectedMedia.athlete_name}</Text>
-                  <Text style={styles.videoPlaceholderSubtext}>Toque para reproduzir</Text>
-                </View>
-              )}
-              
-              <View style={styles.videoOverlay}>
-                <View style={styles.videoInfoOverlay}>
-                  <Text style={styles.videoTitleOverlay}>
-                    {selectedMedia.athlete_name || 'Mídia'}
-                  </Text>
-                  <Text style={styles.videoDateOverlay}>
-                    {formatDate(selectedMedia.uploaded_at)}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
+          <TouchableOpacity
+            style={styles.deleteButtonModal}
+            onPress={deleteFromModal}
+          >
+            <Icon name="trash-outline" size={26} color="#EF4444" />
+          </TouchableOpacity>
+
+          <View style={styles.positionIndicator}>
+            <Text style={styles.positionText}>
+              {selectedMediaIndex + 1} / {media.length}
+            </Text>
+          </View>
+
+          <FlatList
+            ref={flatListRef}
+            data={media}
+            keyExtractor={(item) => item.id}
+            renderItem={renderModalItem}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={width}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            initialScrollIndex={selectedMediaIndex}
+            onScroll={(event) => {
+              const index = Math.round(event.nativeEvent.contentOffset.x / width);
+              if (index !== selectedMediaIndex) {
+                const prevId = media[selectedMediaIndex]?.id;
+                if (prevId && videoRefs.current[prevId]) {
+                  videoRefs.current[prevId].pauseAsync();
+                }
+                setSelectedMediaIndex(index);
+              }
+            }}
+            scrollEventThrottle={16}
+            getItemLayout={(data, index) => ({
+              length: width,
+              offset: width * index,
+              index,
+            })}
+          />
+
+          <View style={styles.navigationDots}>
+            {media.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.navDot,
+                  index === selectedMediaIndex && styles.navDotActive,
+                ]}
+              />
+            ))}
+          </View>
         </View>
       </Modal>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0D1117',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0D1117',
-  },
-  loadingText: {
-    color: '#6B7280',
-    marginTop: 8,
-  },
-  header: {
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#161B22',
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#30363D',
-    marginBottom: 16,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    paddingVertical: 10,
-    fontSize: 15,
-  },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  athleteCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#161B22',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#30363D',
-  },
-  athleteCardSelected: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#1E3A5F',
-  },
-  athleteAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: 44,
-    height: 44,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  athleteInfo: {
-    flex: 1,
-  },
-  athleteName: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  athleteCategory: {
-    color: '#6B7280',
-    fontSize: 12,
-  },
-  summaryContainer: {
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  summaryTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  summaryCard: {
-    backgroundColor: '#161B22',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#30363D',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#30363D',
-  },
-  summaryLabel: {
-    color: '#6B7280',
-    fontSize: 14,
-  },
-  summaryValue: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  uploadContainer: {
-    marginVertical: 16,
-  },
-  uploadButton: {
-    backgroundColor: '#3B82F6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-  },
-  uploadButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  progressContainer: {
-    marginTop: 12,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  progressLabel: {
-    color: '#9CA3AF',
-    fontSize: 14,
-  },
-  progressPercent: {
-    color: '#3B82F6',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#30363D',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#3B82F6',
-    borderRadius: 3,
-  },
-  mediaContainer: {
-    marginBottom: 20,
-  },
-  mediaTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  mediaGrid: {
-    paddingBottom: 8,
-  },
-  mediaItem: {
-    width: (width - 48) / 3,
-    aspectRatio: 1,
-    backgroundColor: '#161B22',
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#30363D',
-    marginRight: 8,
-    marginBottom: 8,
-    position: 'relative',
-  },
-  mediaImage: {
-    width: '100%',
-    height: '100%',
-  },
-  videoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#0D1117',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoText: {
-    color: '#6B7280',
-    fontSize: 10,
-    marginTop: 2,
-  },
-  mediaOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 4,
-  },
-  mediaDate: {
-    color: '#D1D5DB',
-    fontSize: 9,
-    textAlign: 'center',
-  },
-  mediaActions: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    flexDirection: 'row',
-    gap: 4,
-  },
-  editButton: {
-    backgroundColor: 'rgba(59, 130, 246, 0.8)',
-    padding: 4,
-    borderRadius: 12,
-  },
-  deleteButton: {
-    backgroundColor: 'rgba(239, 68, 68, 0.8)',
-    padding: 4,
-    borderRadius: 12,
-  },
-  editModal: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  editModalContent: {
-    backgroundColor: '#161B22',
-    borderRadius: 12,
-    padding: 16,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#30363D',
-  },
-  editInput: {
-    backgroundColor: '#0D1117',
-    borderWidth: 1,
-    borderColor: '#30363D',
-    borderRadius: 8,
-    padding: 12,
-    color: '#FFFFFF',
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  editModalActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: '#3B82F6',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  cancelEditButton: {
-    flex: 1,
-    backgroundColor: '#21262D',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelEditText: {
-    color: '#9CA3AF',
-    fontWeight: '600',
-  },
-  noMediaContainer: {
-    alignItems: 'center',
-    paddingVertical: 30,
-  },
-  noMediaText: {
-    color: '#6B7280',
-    fontSize: 14,
-    marginTop: 8,
-  },
-  noMediaSubtext: {
-    color: '#4B5563',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  fullscreenContainer: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 40,
-    left: 20,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 10,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  videoWrapper: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000000',
-  },
-  fullscreenImage: {
-    width: width,
-    height: height * 0.8,
-    backgroundColor: '#000000',
-  },
-  videoContainer: {
-    width: width,
-    height: height * 0.8,
-    backgroundColor: '#0D1117',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoPlaceholderText: {
-    color: '#9CA3AF',
-    fontSize: 16,
-    marginTop: 8,
-  },
-  videoPlaceholderSubtext: {
-    color: '#6B7280',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  videoOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    paddingBottom: 40,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  videoInfoOverlay: {
-    flex: 1,
-  },
-  videoTitleOverlay: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  videoDateOverlay: {
-    color: '#9CA3AF',
-    fontSize: 14,
-  },
-});

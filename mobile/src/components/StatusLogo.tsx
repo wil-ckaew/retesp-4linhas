@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Image, StyleSheet, Text } from 'react-native';
 
 interface StatusLogoProps {
@@ -7,6 +7,33 @@ interface StatusLogoProps {
 }
 
 export const StatusLogo: React.FC<StatusLogoProps> = ({ size = 50, showText = true }) => {
+  const [imageError, setImageError] = useState(false);
+
+  // Se houve erro ao carregar a imagem, mostra o fallback com texto
+  if (imageError) {
+    return (
+      <View style={[styles.container, { width: size, height: size }]}>
+        <View style={[styles.logoContainer, { width: size, height: size, borderRadius: size / 2 }]}>
+          <View style={styles.fallbackContainer}>
+            <Text style={[styles.fallbackText, { fontSize: size * 0.35 }]}>4L</Text>
+            <View style={styles.fallbackBall}>
+              <Text style={[styles.fallbackBallText, { fontSize: size * 0.15 }]}>⚽</Text>
+            </View>
+          </View>
+          <View style={styles.logoBadge}>
+            <Text style={[styles.logoBadgeText, { fontSize: size * 0.15 }]}>⚽</Text>
+          </View>
+        </View>
+        {showText && (
+          <View style={styles.textContainer}>
+            <Text style={[styles.logoTitle, { fontSize: size * 0.2 }]}>RETESP</Text>
+            <Text style={[styles.logoSubtitle, { fontSize: size * 0.15 }]}>4 Linhas</Text>
+          </View>
+        )}
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { width: size, height: size }]}>
       <View style={[styles.logoContainer, { width: size, height: size, borderRadius: size / 2 }]}>
@@ -14,15 +41,16 @@ export const StatusLogo: React.FC<StatusLogoProps> = ({ size = 50, showText = tr
           source={require('../../assets/logo.png')} 
           style={[styles.logo, { width: size * 0.7, height: size * 0.7 }]}
           resizeMode="contain"
+          onError={() => setImageError(true)}
         />
         <View style={styles.logoBadge}>
-          <Text style={styles.logoBadgeText}>4L</Text>
+          <Text style={[styles.logoBadgeText, { fontSize: size * 0.15 }]}>⚽</Text>
         </View>
       </View>
       {showText && (
         <View style={styles.textContainer}>
-          <Text style={[styles.logoText, { fontSize: size * 0.2 }]}>RETESP</Text>
-          <Text style={[styles.logoSubtext, { fontSize: size * 0.15 }]}>4 Linhas</Text>
+          <Text style={[styles.logoTitle, { fontSize: size * 0.2 }]}>RETESP</Text>
+          <Text style={[styles.logoSubtitle, { fontSize: size * 0.15 }]}>4 Linhas</Text>
         </View>
       )}
     </View>
@@ -49,7 +77,28 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   logo: {
-    tintColor: '#EF4444',
+    width: '70%',
+    height: '70%',
+  },
+  fallbackContainer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#1A1A2E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  fallbackText: {
+    color: '#EF4444',
+    fontWeight: 'bold',
+  },
+  fallbackBall: {
+    position: 'absolute',
+    bottom: 4,
+    right: 6,
+  },
+  fallbackBallText: {
+    color: '#10B981',
   },
   logoBadge: {
     position: 'absolute',
@@ -64,18 +113,17 @@ const styles = StyleSheet.create({
   },
   logoBadgeText: {
     color: '#FFFFFF',
-    fontSize: 8,
     fontWeight: 'bold',
   },
   textContainer: {
     marginTop: 4,
     alignItems: 'center',
   },
-  logoText: {
+  logoTitle: {
     color: '#EF4444',
     fontWeight: 'bold',
   },
-  logoSubtext: {
+  logoSubtitle: {
     color: '#10B981',
     fontWeight: 'bold',
   },

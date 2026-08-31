@@ -1,11 +1,118 @@
-// Substituir a parte do story RETESP no componente StoriesComponent
-// Procurar por:
-// <View style={styles.storyRETESP}>
-//   <Text style={styles.storyRETESPText}>R4</Text>
-//   <View style={styles.storyRETESPBadge}>
-//     <Text style={styles.storyRETESPBadgeText}>4L</Text>
-//   </View>
-// </View>
+// Adicionar a importação no topo do arquivo
+import { RETESPStory } from '../components/RETESPStory';
 
-// Substituir por:
-// <StatusLogo size={56} showText={false} />
+// Depois, adicionar um story especial do RETESP nos stories padrão
+const [stories, setStories] = useState<Story[]>([
+  { 
+    id: 1, 
+    user: 'RETESP 4L', 
+    type: 'image', 
+    isRETESP: true,
+    image: 'https://via.placeholder.com/150/EF4444/FFFFFF?text=⚽'
+  },
+  { id: 2, user: 'João', image: 'https://i.pravatar.cc/150?img=1', type: 'image' },
+  { id: 3, user: 'Pedro', image: 'https://i.pravatar.cc/150?img=2', type: 'image' },
+  { id: 4, user: 'Lucas', image: 'https://i.pravatar.cc/150?img=3', type: 'image' },
+]);
+
+// Substituir o StoryItem
+const StoryItem = ({ story }: { story: Story }) => (
+  <TouchableOpacity style={styles.storyItem} onPress={() => openStory(story)}>
+    <View style={styles.storyAvatarWrapper}>
+      <View style={[styles.storyAvatar, { borderColor: story.isRETESP ? '#EF4444' : '#3B82F6' }]}>
+        {story.isRETESP ? (
+          <RETESPStory size={64} />
+        ) : story.type === 'video' ? (
+          <View style={styles.storyVideoPlaceholder}>
+            <Icon name="play" size={24} color="#FFFFFF" />
+          </View>
+        ) : story.image ? (
+          <Image source={{ uri: story.image }} style={styles.storyAvatarImage} />
+        ) : (
+          <View style={styles.storyAvatarDefault}>
+            <Text style={styles.storyAvatarText}>{story.user.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+    <Text style={[styles.storyUserName, story.isRETESP && { color: '#EF4444', fontWeight: 'bold' }]} numberOfLines={1}>
+      {story.user}
+    </Text>
+  </TouchableOpacity>
+);
+
+// Atualizar a interface Story
+interface Story {
+  id: number;
+  user: string;
+  image?: string;
+  video_url?: string;
+  type: 'image' | 'video';
+  isRETESP?: boolean;
+}
+
+// No shareToStatus, adicionar opção para compartilhar como RETESP
+const shareToStatus = (post: Post) => {
+  Alert.alert(
+    'Compartilhar como',
+    'Deseja compartilhar como:',
+    [
+      {
+        text: 'Seu perfil',
+        onPress: () => {
+          if (post.video_url) {
+            const newStory: Story = {
+              id: Date.now(),
+              user: 'Você',
+              video_url: `${API_URL}${post.video_url}`,
+              type: 'video',
+            };
+            setStories(prev => [newStory, ...prev]);
+            Alert.alert('📱 Sucesso!', 'Vídeo compartilhado para o seu Story!');
+          } else if (post.image_url) {
+            const newStory: Story = {
+              id: Date.now(),
+              user: 'Você',
+              image: `${API_URL}${post.image_url}`,
+              type: 'image',
+            };
+            setStories(prev => [newStory, ...prev]);
+            Alert.alert('📸 Sucesso!', 'Imagem compartilhada para o seu Story!');
+          } else {
+            Alert.alert('Aviso', 'Esta postagem não tem mídia para compartilhar.');
+          }
+        },
+      },
+      {
+        text: 'RETESP 4L',
+        onPress: () => {
+          if (post.video_url) {
+            const newStory: Story = {
+              id: Date.now(),
+              user: 'RETESP 4L',
+              video_url: `${API_URL}${post.video_url}`,
+              type: 'video',
+              isRETESP: true,
+            };
+            setStories(prev => [newStory, ...prev]);
+            Alert.alert('⚽ Sucesso!', 'Vídeo compartilhado como RETESP 4L!');
+          } else if (post.image_url) {
+            const newStory: Story = {
+              id: Date.now(),
+              user: 'RETESP 4L',
+              image: `${API_URL}${post.image_url}`,
+              type: 'image',
+              isRETESP: true,
+            };
+            setStories(prev => [newStory, ...prev]);
+            Alert.alert('⚽ Sucesso!', 'Imagem compartilhada como RETESP 4L!');
+          } else {
+            Alert.alert('Aviso', 'Esta postagem não tem mídia para compartilhar.');
+          }
+        },
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]
+  );
+  setShareModalVisible(false);
+};

@@ -1,7 +1,7 @@
-//  frontend/src/app/social/page.tsx
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Heart, MessageCircle, Share2, MoreHorizontal, Image as ImageIcon, Video, X, Send, Trash2, Link as LinkIcon, Copy, Check, Play } from "lucide-react";
+import { Heart, MessageCircle, Share2, MoreHorizontal, Image as ImageIcon, Video, X, Send, Trash2, Copy, Check, Play } from "lucide-react";
+import { RETESPStory } from "@/components/RETESPStory";
 
 type SocialPost = {
   id: string;
@@ -21,6 +21,7 @@ type Story = {
   image?: string;
   video_url?: string;
   type: 'image' | 'video';
+  isRETESP?: boolean;
 };
 
 export default function SocialPage() {
@@ -37,7 +38,6 @@ export default function SocialPage() {
   const [newPostContent, setNewPostContent] = useState("");
   const [newPostTeam, setNewPostTeam] = useState("Sub-12");
   
-  // Estado separado para foto e vídeo
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -45,11 +45,22 @@ export default function SocialPage() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
-  const [stories, setStories] = useState<Story[]>([
-    { id: 1, user: "João", image: "https://i.pravatar.cc/150?img=1", type: 'image' },
-    { id: 2, user: "Pedro", image: "https://i.pravatar.cc/150?img=2", type: 'image' },
-    { id: 3, user: "Lucas", image: "https://i.pravatar.cc/150?img=3", type: 'image' },
+  // Story do RETESP - sempre o primeiro
+  const [retepsStory, setRetepsStory] = useState<Story>({
+    id: 1,
+    user: 'RETESP 4L',
+    type: 'image',
+    isRETESP: true,
+    image: 'https://via.placeholder.com/150/EF4444/FFFFFF?text=⚽'
+  });
+
+  const [userStories, setUserStories] = useState<Story[]>([
+    { id: 2, user: 'João', image: 'https://i.pravatar.cc/150?img=1', type: 'image' },
+    { id: 3, user: 'Pedro', image: 'https://i.pravatar.cc/150?img=2', type: 'image' },
+    { id: 4, user: 'Lucas', image: 'https://i.pravatar.cc/150?img=3', type: 'image' },
   ]);
+
+  const stories = [retepsStory, ...userStories];
   const [selectedStory, setSelectedStory] = useState<number | null>(null);
 
   const fetchFeed = async () => {
@@ -94,7 +105,6 @@ export default function SocialPage() {
   };
 
   const handleCreatePost = async () => {
-    // Verifica se há conteúdo ou arquivos
     if (!newPostContent.trim() && !selectedPhoto && !selectedVideo) {
       alert("Escreva algo ou selecione um arquivo.");
       return;
@@ -105,7 +115,6 @@ export default function SocialPage() {
     let video_url: string | null = null;
 
     try {
-      // 1. Se houver uma foto selecionada, faz o upload
       if (selectedPhoto) {
         const formData = new FormData();
         formData.append("file", selectedPhoto);
@@ -126,7 +135,6 @@ export default function SocialPage() {
         image_url = uploadData.url;
       }
 
-      // 2. Se houver um vídeo selecionado, faz o upload
       if (selectedVideo) {
         const formData = new FormData();
         formData.append("file", selectedVideo);
@@ -147,7 +155,6 @@ export default function SocialPage() {
         video_url = uploadData.url;
       }
 
-      // 3. Criar a postagem no Backend
       const res = await fetch("http://localhost:8081/social/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -221,31 +228,73 @@ export default function SocialPage() {
 
   const shareToInstagram = (post: SocialPost) => {
     const url = encodeURIComponent(`${window.location.origin}/social?post=${post.id}`);
-    window.location.href = `instagram://share?text=${encodeURIComponent(post.content)}&url=${url}`;
+    window.open(`https://www.instagram.com/`, '_blank');
     setShareMenuOpenId(null);
   };
 
   const shareToStatus = (post: SocialPost) => {
-    if (post.video_url) {
-      const newStory: Story = {
-        id: Date.now(),
-        user: "Você",
-        video_url: post.video_url,
-        type: 'video',
-      };
-      setStories(prev => [newStory, ...prev]);
-      alert("📱 Vídeo compartilhado para o seu Story!");
-    } else if (post.image_url) {
-      const newStory: Story = {
-        id: Date.now(),
-        user: "Você",
-        image: `http://localhost:8081${post.image_url}`,
-        type: 'image',
-      };
-      setStories(prev => [newStory, ...prev]);
-      alert("📸 Imagem compartilhada para o seu Story!");
+    // Perguntar como compartilhar
+    const choice = confirm(
+      "Compartilhar como:\n\n" +
+      "OK = Seu perfil\n" +
+      "Cancelar = RETESP 4L"
+    );
+
+    if (choice) {
+      // Seu perfil
+      if (post.video_url) {
+        const newStory: Story = {
+          id: Date.now(),
+          user: "Você",
+          video_url: `http://localhost:8081${post.video_url}`,
+          type: 'video',
+        };
+        setUserStories(prev => [newStory, ...prev]);
+        alert("📱 Vídeo compartilhado para o seu Story!");
+      } else if (post.image_url) {
+        const newStory: Story = {
+          id: Date.now(),
+          user: "Você",
+          image: `http://localhost:8081${post.image_url}`,
+          type: 'image',
+        };
+        setUserStories(prev => [newStory, ...prev]);
+        alert("📸 Imagem compartilhada para o seu Story!");
+      } else {
+        alert("Esta postagem não tem mídia para compartilhar.");
+      }
     } else {
-      alert("Esta postagem não tem mídia para compartilhar.");
+      // RETESP 4L
+      if (post.video_url) {
+        const videoUrl = `http://localhost:8081${post.video_url}`;
+        const newStory: Story = {
+          id: 1,
+          user: 'RETESP 4L',
+          video_url: videoUrl,
+          type: 'video',
+          isRETESP: true,
+          image: 'https://via.placeholder.com/150/EF4444/FFFFFF?text=⚽'
+        };
+        setRetepsStory(newStory);
+        alert("⚽ Vídeo compartilhado como RETESP 4L!");
+        // Abrir o story automaticamente
+        setTimeout(() => setSelectedStory(1), 300);
+      } else if (post.image_url) {
+        const imageUrl = `http://localhost:8081${post.image_url}`;
+        const newStory: Story = {
+          id: 1,
+          user: 'RETESP 4L',
+          image: imageUrl,
+          type: 'image',
+          isRETESP: true,
+        };
+        setRetepsStory(newStory);
+        alert("⚽ Imagem compartilhada como RETESP 4L!");
+        // Abrir o story automaticamente
+        setTimeout(() => setSelectedStory(1), 300);
+      } else {
+        alert("Esta postagem não tem mídia para compartilhar.");
+      }
     }
     setShareMenuOpenId(null);
   };
@@ -254,32 +303,60 @@ export default function SocialPage() {
 
   return (
     <div className="p-8 max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">📱 Rede Social RETESP</h1>
+      <h1 className="text-3xl font-bold mb-6 text-white">📱 Rede Social RETESP</h1>
 
       {/* Stories */}
       <div className="bg-[#161B22] border border-[#30363D] rounded-2xl p-4 mb-6 overflow-x-auto">
         <h2 className="text-sm font-bold text-gray-400 mb-3">Stories</h2>
         <div className="flex gap-4">
-          {stories.map((story) => (
-            <div 
-              key={story.id}
-              onClick={() => setSelectedStory(story.id)}
-              className="flex flex-col items-center gap-1 cursor-pointer hover:opacity-80 transition"
-            >
-              <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 p-1">
-                <div className="w-full h-full bg-[#161B22] rounded-full overflow-hidden border-2 border-[#161B22] relative">
-                  {story.type === 'video' ? (
-                    <div className="w-full h-full flex items-center justify-center bg-black">
-                      <Play size={24} className="text-white opacity-80" />
-                    </div>
-                  ) : (
-                    <img src={story.image} alt={story.user} className="w-full h-full object-cover" />
-                  )}
+          {stories.map((story) => {
+            const isRETESP = story.isRETESP === true;
+            const hasMedia = story.video_url || (story.image && !story.image.includes('placeholder'));
+            
+            return (
+              <div 
+                key={story.id}
+                onClick={() => setSelectedStory(story.id)}
+                className="flex flex-col items-center gap-1 cursor-pointer hover:opacity-80 transition"
+              >
+                <div 
+                  className="w-16 h-16 rounded-full p-1"
+                  style={{ 
+                    background: isRETESP ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #8B5CF6, #EC4899)'
+                  }}
+                >
+                  <div className="w-full h-full bg-[#161B22] rounded-full overflow-hidden border-2 border-[#161B22] relative flex items-center justify-center">
+                    {isRETESP ? (
+                      <div className="relative flex items-center justify-center w-full h-full">
+                        <RETESPStory size={56} />
+                        {hasMedia && (
+                          <div className="absolute bottom-0 right-0 bg-red-500 rounded-full p-0.5 border border-white">
+                            <Play size={14} className="text-white" />
+                          </div>
+                        )}
+                      </div>
+                    ) : story.type === 'video' ? (
+                      <div className="w-full h-full flex items-center justify-center bg-black">
+                        <Play size={24} className="text-white opacity-80" />
+                      </div>
+                    ) : (
+                      <img src={story.image} alt={story.user} className="w-full h-full object-cover" />
+                    )}
+                  </div>
                 </div>
+                <span className="text-xs">
+                  {isRETESP ? (
+                    <>
+                      <span className="text-red-500 font-bold">RETESP</span>
+                      <span className="text-green-500 font-bold"> 4L</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-400">{story.user}</span>
+                  )}
+                </span>
               </div>
-              <span className="text-xs text-gray-400">{story.user}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -289,31 +366,55 @@ export default function SocialPage() {
           <div className="bg-[#161B22] border border-[#30363D] rounded-2xl p-6 max-w-2xl w-full relative">
             <button 
               onClick={() => setSelectedStory(null)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-white z-10"
+              className="absolute top-2 right-2 text-gray-400 hover:text-white z-10 p-2 hover:bg-[#21262D] rounded-full transition"
             >
-              ✕
+              <X size={24} />
             </button>
             <div className="flex flex-col items-center">
-              <h2 className="text-xl font-bold mb-4">{stories.find(s => s.id === selectedStory)?.user}</h2>
-              <div className="w-full aspect-video bg-[#0D1117] rounded-lg overflow-hidden">
+              {stories.find(s => s.id === selectedStory)?.isRETESP ? (
+                <div className="flex items-center gap-3 mb-4">
+                  <RETESPStory size={40} />
+                  <h2 className="text-xl font-bold">
+                    <span className="text-red-500">RETESP</span>
+                    <span className="text-green-500"> 4L</span>
+                  </h2>
+                </div>
+              ) : (
+                <h2 className="text-xl font-bold mb-4 text-white">
+                  {stories.find(s => s.id === selectedStory)?.user}
+                </h2>
+              )}
+              <div className="w-full aspect-video bg-[#0D1117] rounded-lg overflow-hidden relative">
                 {stories.find(s => s.id === selectedStory)?.type === 'video' ? (
                   <video 
-                    src={stories.find(s => s.id === selectedStory)?.video_url ? `http://localhost:8081${stories.find(s => s.id === selectedStory)?.video_url}` : ''}
-                    className="w-full h-full object-cover"
+                    src={stories.find(s => s.id === selectedStory)?.video_url || ''}
+                    className="w-full h-full object-contain"
                     controls
                     autoPlay
                   />
+                ) : stories.find(s => s.id === selectedStory)?.isRETESP && 
+                   !stories.find(s => s.id === selectedStory)?.image?.includes('placeholder') ? (
+                  <img 
+                    src={stories.find(s => s.id === selectedStory)?.image} 
+                    alt="Story" 
+                    className="w-full h-full object-contain" 
+                  />
+                ) : stories.find(s => s.id === selectedStory)?.isRETESP ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-[#161B22]">
+                    <RETESPStory size={120} />
+                    <p className="text-gray-400 mt-4 text-lg">⚽ Gestão Esportiva</p>
+                  </div>
                 ) : (
                   <img 
                     src={stories.find(s => s.id === selectedStory)?.image} 
                     alt="Story" 
-                    className="w-full h-full object-cover" 
+                    className="w-full h-full object-contain" 
                   />
                 )}
               </div>
               <button 
                 onClick={() => setSelectedStory(null)}
-                className="mt-4 bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg"
+                className="mt-4 bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg text-white font-medium transition"
               >
                 Fechar
               </button>
@@ -326,7 +427,9 @@ export default function SocialPage() {
       <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
         <button 
           onClick={() => filterByTeam(null)}
-          className={`px-3 py-1 rounded-full text-sm font-medium transition ${!selectedTeam ? 'bg-blue-600 text-white' : 'bg-[#21262D] text-gray-400 hover:text-white'}`}
+          className={`px-3 py-1 rounded-full text-sm font-medium transition ${
+            !selectedTeam ? 'bg-blue-600 text-white' : 'bg-[#21262D] text-gray-400 hover:text-white'
+          }`}
         >
           Todas
         </button>
@@ -334,7 +437,9 @@ export default function SocialPage() {
           <button 
             key={team}
             onClick={() => filterByTeam(team)}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition ${selectedTeam === team ? 'bg-blue-600 text-white' : 'bg-[#21262D] text-gray-400 hover:text-white'}`}
+            className={`px-3 py-1 rounded-full text-sm font-medium transition ${
+              selectedTeam === team ? 'bg-blue-600 text-white' : 'bg-[#21262D] text-gray-400 hover:text-white'
+            }`}
           >
             {team}
           </button>
@@ -343,7 +448,7 @@ export default function SocialPage() {
 
       {/* Formulário de Nova Postagem */}
       <div className="bg-[#161B22] border border-[#30363D] rounded-2xl p-6 mb-6">
-        <h2 className="text-lg font-bold mb-4">Criar Postagem</h2>
+        <h2 className="text-lg font-bold mb-4 text-white">Criar Postagem</h2>
         <div className="space-y-3">
           <div className="flex gap-2">
             <select
@@ -359,10 +464,10 @@ export default function SocialPage() {
           <textarea
             value={newPostContent}
             onChange={(e) => setNewPostContent(e.target.value)}
-            className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-white min-h-[80px] resize-none"
+            className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-white min-h-[80px] resize-none focus:outline-none focus:border-blue-500"
             placeholder="O que está acontecendo?"
           />
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             {/* Botão para anexar foto */}
             <div className="relative">
               <input
@@ -374,7 +479,7 @@ export default function SocialPage() {
               />
               <button
                 onClick={() => photoInputRef.current?.click()}
-                className="flex items-center gap-2 text-gray-400 hover:text-white transition"
+                className="flex items-center gap-2 text-gray-400 hover:text-white transition px-3 py-2 rounded-lg hover:bg-[#21262D]"
               >
                 <ImageIcon size={20} />
                 <span className="text-sm">
@@ -406,7 +511,7 @@ export default function SocialPage() {
               />
               <button
                 onClick={() => videoInputRef.current?.click()}
-                className="flex items-center gap-2 text-gray-400 hover:text-white transition"
+                className="flex items-center gap-2 text-gray-400 hover:text-white transition px-3 py-2 rounded-lg hover:bg-[#21262D]"
               >
                 <Video size={20} />
                 <span className="text-sm">
@@ -431,7 +536,7 @@ export default function SocialPage() {
             <button
               onClick={handleCreatePost}
               disabled={uploading}
-              className="ml-auto bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"
+              className="ml-auto bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 text-white disabled:opacity-50"
             >
               {uploading ? "Publicando..." : <><Send size={16} /> Publicar</>}
             </button>
@@ -453,11 +558,11 @@ export default function SocialPage() {
               <div key={post.id} className="bg-[#161B22] border border-[#30363D] rounded-2xl p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold">
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold text-white">
                       {post.author_name.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-bold">{post.team_name}</p>
+                      <p className="font-bold text-white">{post.team_name}</p>
                       <p className="text-xs text-gray-400">{post.author_name} • {new Date(post.created_at).toLocaleString()}</p>
                     </div>
                   </div>
@@ -534,7 +639,7 @@ export default function SocialPage() {
                   </div>
                 </div>
                 
-                <p className="mb-4 whitespace-pre-wrap">{post.content}</p>
+                <p className="mb-4 whitespace-pre-wrap text-white">{post.content}</p>
 
                 {post.image_url && (
                   <div className="w-full h-64 bg-[#0D1117] border border-[#21262D] rounded-lg mb-4 overflow-hidden relative">
@@ -566,7 +671,8 @@ export default function SocialPage() {
                     onClick={() => toggleLike(post.id)}
                     className="flex items-center gap-2 text-gray-400 hover:text-red-500 transition"
                   >
-                    <Heart size={20} /> {likes[post.id] || 0}
+                    <Heart size={20} className={likes[post.id] > 0 ? 'fill-red-500 text-red-500' : ''} /> 
+                    {likes[post.id] || 0}
                   </button>
                   <button className="flex items-center gap-2 text-gray-400 hover:text-blue-500 transition">
                     <MessageCircle size={20} /> {post.comments}
