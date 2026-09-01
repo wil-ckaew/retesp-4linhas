@@ -18,9 +18,11 @@ import { API_URL } from '../services/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { useTheme } from '../context/ThemeContext';
 
 export default function CreateAthleteScreen() {
   const navigation = useNavigation();
+  const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateText, setDateText] = useState('');
@@ -63,16 +65,21 @@ export default function CreateAthleteScreen() {
 
       if (!result.canceled) {
         const asset = result.assets[0];
+        console.log('📸 Foto selecionada:', asset.uri);
+        
+        // Criar nome com extensão .jpg
+        const filename = `avatar_${Date.now()}.jpg`;
+        
         setAvatarFile({
           uri: asset.uri,
-          type: asset.type || 'image/jpeg',
-          name: asset.fileName || `avatar_${Date.now()}.jpg`,
+          type: 'image/jpeg',
+          name: filename,
         });
         setAvatarPreview(asset.uri);
-        Alert.alert('Sucesso', 'Foto selecionada!');
+        console.log('📸 Arquivo preparado:', { name: filename });
       }
     } catch (error) {
-      console.error('Erro:', error);
+      console.error('Erro ao selecionar imagem:', error);
       Alert.alert('Erro', 'Não foi possível selecionar a imagem');
     }
   };
@@ -90,13 +97,14 @@ export default function CreateAthleteScreen() {
       });
 
       if (result.type === 'success') {
+        console.log('📄 PDF selecionado:', result.name);
+        const filename = `medical_${Date.now()}.pdf`;
+        
         setMedicalFile({
           uri: result.uri,
-          type: result.mimeType || 'application/pdf',
-          name: result.name || `medical_${Date.now()}.pdf`,
+          type: 'application/pdf',
+          name: filename,
         });
-        Alert.alert('Sucesso', 'PDF selecionado!');
-        console.log('✅ PDF selecionado:', result.name);
       }
     } catch (error) {
       console.error('Erro PDF:', error);
@@ -110,13 +118,16 @@ export default function CreateAthleteScreen() {
 
   const uploadFile = async (file) => {
     try {
+      console.log('📤 Enviando arquivo:', file.name);
+      
       const formData = new FormData();
       formData.append('file', {
         uri: file.uri,
-        type: file.type,
+        type: file.type || 'image/jpeg',
         name: file.name,
-      });
+      } as any);
 
+      // IMPORTANTE: Não definir Content-Type manualmente
       const response = await fetch(`${API_URL}/upload`, {
         method: 'POST',
         body: formData,
@@ -126,49 +137,44 @@ export default function CreateAthleteScreen() {
       });
 
       const data = await response.json();
+      console.log('📥 Resposta upload:', data);
+
       if (response.ok && data.url) {
+        console.log('✅ Arquivo enviado:', data.url);
         return data.url;
       } else {
         throw new Error(data.error || 'Erro no upload');
       }
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('❌ Erro upload:', error);
       throw error;
     }
   };
 
   const handleCreateAthlete = async () => {
-    console.log('🚀 INICIANDO CRIAÇÃO');
+    console.log('🚀 INICIANDO CRIAÇÃO DO ATLETA');
 
     if (!formData.name.trim()) {
-      Alert.alert('Erro', 'Digite o nome do atleta');
+      Alert.alert('❌ Erro', 'Digite o nome do atleta');
       return;
     }
     if (!formData.category) {
-      Alert.alert('Erro', 'Selecione uma categoria');
+      Alert.alert('❌ Erro', 'Selecione uma categoria');
       return;
     }
 
     setLoading(true);
+    
     try {
       let uploadedAvatarUrl = null;
-      let uploadedMedicalUrl = null;
 
       if (avatarFile) {
         try {
+          console.log('📸 Enviando foto...');
           uploadedAvatarUrl = await uploadFile(avatarFile);
           console.log('✅ Foto enviada:', uploadedAvatarUrl);
         } catch (error) {
-          console.error('Erro upload foto:', error);
-        }
-      }
-
-      if (medicalFile) {
-        try {
-          uploadedMedicalUrl = await uploadFile(medicalFile);
-          console.log('✅ PDF enviado:', uploadedMedicalUrl);
-        } catch (error) {
-          console.error('Erro upload PDF:', error);
+          console.error('❌ Erro ao enviar foto:', error);
         }
       }
 
@@ -178,26 +184,26 @@ export default function CreateAthleteScreen() {
         birth_date: birthDateStr,
         category: formData.category,
         avatar_url: uploadedAvatarUrl,
-        medical_form_url: uploadedMedicalUrl,
+        medical_form_url: null,
       };
 
-      console.log('📦 Enviando:', JSON.stringify(athleteData));
+      console.log('📦 Enviando para /athletes:', JSON.stringify(athleteData, null, 2));
 
       const response = await fetch(`${API_URL}/athletes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify(athleteData),
       });
 
       const data = await response.json();
-      console.log('📥 Resposta:', data);
+      console.log('📥 Resposta /athletes:', data);
 
       setLoading(false);
 
-      // Usar setTimeout para garantir que o Alert aparece após o loading
-      setTimeout(() => {
+      if (response.ok) {
         Alert.alert(
           '✅ Sucesso!',
           `Atleta ${formData.name} criado com sucesso!`,
@@ -208,7 +214,17 @@ export default function CreateAthleteScreen() {
                 navigation.dispatch(
                   CommonActions.reset({
                     index: 0,
-                    routes: [{ name: 'AthletesList' }],
+                    routes: [
+                      { 
+                        name: 'Main',
+                        state: {
+                          index: 0,
+                          routes: [
+                            { name: 'Atletas' }
+                          ]
+                        }
+                      }
+                    ],
                   })
                 );
               },
@@ -216,12 +232,13 @@ export default function CreateAthleteScreen() {
           ],
           { cancelable: false }
         );
-      }, 300);
-
+      } else {
+        Alert.alert('❌ Erro', typeof data === 'string' ? data : 'Erro ao cadastrar atleta');
+      }
     } catch (error) {
-      console.error('❌ Erro:', error);
+      console.error('❌ Erro no cadastro:', error);
       setLoading(false);
-      Alert.alert('Erro', 'Erro de conexão com o servidor');
+      Alert.alert('❌ Erro', 'Erro de conexão com o servidor. Tente novamente.');
     }
   };
 
@@ -233,12 +250,116 @@ export default function CreateAthleteScreen() {
     }
   };
 
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    scrollContent: { paddingBottom: 40 },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 8,
+      backgroundColor: colors.background,
+    },
+    backButton: { padding: 8 },
+    headerTitle: { color: colors.text, fontSize: 20, fontWeight: 'bold' },
+    headerPlaceholder: { width: 40 },
+    formCard: { 
+      margin: 16, 
+      padding: 20, 
+      backgroundColor: colors.card, 
+      borderRadius: 16, 
+      borderWidth: 1, 
+      borderColor: colors.border 
+    },
+    formGroup: { marginBottom: 20 },
+    label: { color: colors.text, fontSize: 14, fontWeight: '500', marginBottom: 8 },
+    helperText: { fontSize: 12, marginBottom: 8, color: colors.textSecondary },
+    input: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      color: colors.text,
+      fontSize: 16,
+    },
+    dateContainer: { flexDirection: 'row', gap: 8 },
+    dateInputText: { flex: 1 },
+    datePickerButton: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      padding: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    categoriesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    categoryButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: colors.hover || '#21262D',
+      borderWidth: 1,
+      borderColor: colors.border,
+      minWidth: 70,
+      alignItems: 'center',
+    },
+    categoryButtonActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    categoryText: { color: colors.textSecondary, fontSize: 13, fontWeight: '500' },
+    categoryTextActive: { color: '#FFFFFF' },
+    uploadButton: {
+      backgroundColor: colors.background,
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+      borderRadius: 12,
+      padding: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 70,
+    },
+    uploadText: { color: colors.text, fontSize: 14, marginTop: 4, fontWeight: '500' },
+    fileContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      padding: 12,
+      gap: 12,
+    },
+    previewImage: { width: 50, height: 50, borderRadius: 8, resizeMode: 'cover' },
+    fileName: { flex: 1, color: colors.text, fontSize: 14 },
+    actionsContainer: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginTop: 8 },
+    button: { 
+      flex: 1, 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      paddingVertical: 14, 
+      borderRadius: 12, 
+      gap: 8 
+    },
+    buttonCancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
+    buttonCancelText: { color: colors.textSecondary, fontSize: 16, fontWeight: '600' },
+    buttonCreate: { backgroundColor: colors.primary || '#3B82F6' },
+    buttonCreateText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+    buttonCreateDisabled: { opacity: 0.5 },
+    footer: { paddingHorizontal: 16, marginTop: 12, alignItems: 'center' },
+    footerText: { color: colors.textSecondary, fontSize: 12 },
+  });
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Icon name="arrow-back" size={24} color="#FFFFFF" />
+            <Icon name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Novo Atleta</Text>
           <View style={styles.headerPlaceholder} />
@@ -250,7 +371,7 @@ export default function CreateAthleteScreen() {
             <TextInput
               style={styles.input}
               placeholder="Digite o nome completo"
-              placeholderTextColor="#6B7280"
+              placeholderTextColor={colors.textSecondary}
               value={formData.name}
               onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
             />
@@ -262,7 +383,7 @@ export default function CreateAthleteScreen() {
               <TextInput
                 style={[styles.input, styles.dateInputText]}
                 placeholder="DD/MM/AAAA"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={colors.textSecondary}
                 value={dateText}
                 onChangeText={(text) => {
                   let cleaned = text.replace(/\D/g, '');
@@ -292,7 +413,7 @@ export default function CreateAthleteScreen() {
                 maxLength={10}
               />
               <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePicker(true)}>
-                <Icon name="calendar" size={24} color="#3B82F6" />
+                <Icon name="calendar" size={24} color={colors.primary} />
               </TouchableOpacity>
             </View>
             {showDatePicker && (
@@ -308,7 +429,7 @@ export default function CreateAthleteScreen() {
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Categoria *</Text>
-            <Text style={[styles.helperText, { color: formData.category ? '#10B981' : '#6B7280' }]}>
+            <Text style={[styles.helperText, { color: formData.category ? '#10B981' : colors.textSecondary }]}>
               {formData.category ? `✅ ${formData.category}` : '⚠️ Selecione uma categoria'}
             </Text>
             <View style={styles.categoriesGrid}>
@@ -341,8 +462,8 @@ export default function CreateAthleteScreen() {
               </View>
             ) : (
               <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-                <Icon name="cloud-upload" size={32} color="#3B82F6" />
-                <Text style={styles.uploadText}>Selecionar foto</Text>
+                <Icon name="camera" size={32} color={colors.primary} />
+                <Text style={styles.uploadText}>Adicionar foto</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -370,13 +491,22 @@ export default function CreateAthleteScreen() {
           <TouchableOpacity style={[styles.button, styles.buttonCancel]} onPress={() => navigation.goBack()}>
             <Text style={styles.buttonCancelText}>Cancelar</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.buttonCreate]} onPress={handleCreateAthlete} disabled={loading}>
-            {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : (
+          <TouchableOpacity 
+            style={[
+              styles.button, 
+              styles.buttonCreate,
+              loading && styles.buttonCreateDisabled
+            ]} 
+            onPress={handleCreateAthlete} 
+            disabled={loading}
+          >
+            {loading ? 
+              <ActivityIndicator size="small" color="#FFFFFF" /> : 
               <>
                 <Icon name="save" size={20} color="#FFFFFF" />
                 <Text style={styles.buttonCreateText}>Salvar</Text>
               </>
-            )}
+            }
           </TouchableOpacity>
         </View>
 
@@ -387,91 +517,3 @@ export default function CreateAthleteScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1117' },
-  scrollContent: { paddingBottom: 40 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    backgroundColor: '#0D1117',
-  },
-  backButton: { padding: 8 },
-  headerTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' },
-  headerPlaceholder: { width: 40 },
-  formCard: { margin: 16, padding: 20, backgroundColor: '#161B22', borderRadius: 16, borderWidth: 1, borderColor: '#30363D' },
-  formGroup: { marginBottom: 20 },
-  label: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', marginBottom: 8 },
-  helperText: { fontSize: 12, marginBottom: 8 },
-  input: {
-    backgroundColor: '#0D1117',
-    borderWidth: 1,
-    borderColor: '#30363D',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
-  dateContainer: { flexDirection: 'row', gap: 8 },
-  dateInputText: { flex: 1 },
-  datePickerButton: {
-    backgroundColor: '#0D1117',
-    borderWidth: 1,
-    borderColor: '#30363D',
-    borderRadius: 12,
-    padding: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  categoriesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  categoryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#21262D',
-    borderWidth: 1,
-    borderColor: '#30363D',
-    minWidth: 70,
-    alignItems: 'center',
-  },
-  categoryButtonActive: { backgroundColor: '#3B82F6', borderColor: '#3B82F6' },
-  categoryText: { color: '#6B7280', fontSize: 13, fontWeight: '500' },
-  categoryTextActive: { color: '#FFFFFF' },
-  uploadButton: {
-    backgroundColor: '#0D1117',
-    borderWidth: 2,
-    borderColor: '#30363D',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 70,
-  },
-  uploadText: { color: '#FFFFFF', fontSize: 14, marginTop: 4, fontWeight: '500' },
-  fileContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0D1117',
-    borderWidth: 1,
-    borderColor: '#30363D',
-    borderRadius: 12,
-    padding: 12,
-    gap: 12,
-  },
-  previewImage: { width: 50, height: 50, borderRadius: 8, resizeMode: 'cover' },
-  fileName: { flex: 1, color: '#FFFFFF', fontSize: 14 },
-  actionsContainer: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginTop: 8 },
-  button: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, gap: 8 },
-  buttonCancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#30363D' },
-  buttonCancelText: { color: '#6B7280', fontSize: 16, fontWeight: '600' },
-  buttonCreate: { backgroundColor: '#3B82F6' },
-  buttonCreateText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  footer: { paddingHorizontal: 16, marginTop: 12, alignItems: 'center' },
-  footerText: { color: '#6B7280', fontSize: 12 },
-});

@@ -1,0 +1,404 @@
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+from typing import Optional
+import json
+
+app = FastAPI()
+
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class TrainingRequest(BaseModel):
+    category: str
+    duration: str
+    objective: str
+
+class TrainingResponse(BaseModel):
+    training: str
+    fallback: Optional[bool] = False
+    message: Optional[str] = None
+
+@app.get("/")
+@app.get("/health")
+async def health():
+    return {"status": "online", "service": "ai-service", "version": "1.0"}
+
+@app.post("/generate_training")
+async def generate_training(request: TrainingRequest):
+    try:
+        training = generate_mock_training(
+            request.category,
+            request.duration,
+            request.objective
+        )
+        
+        return TrainingResponse(
+            training=training,
+            fallback=False,
+            message="Treino gerado com sucesso!"
+        )
+        
+    except Exception as e:
+        print(f"Erro ao gerar treino: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/chat")
+async def chat(request: Request):
+    try:
+        data = await request.json()
+        message = data.get('message', '')
+        context = data.get('context', [])
+        
+        print(f"📩 Mensagem recebida: {message}")
+        
+        # Gerar resposta inteligente
+        response = generate_chat_response(message, context)
+        
+        print(f"💬 Resposta: {response[:100]}...")
+        
+        return {"response": response, "status": "success"}
+        
+    except Exception as e:
+        print(f"❌ Erro no chat: {e}")
+        return {"response": "Desculpe, tive um problema. Pode repetir?", "status": "error"}
+
+def generate_mock_training(category: str, duration: str, objective: str) -> str:
+    duration_minutes = duration.replace('h', '').replace('min', '').strip()
+    if ':' in duration_minutes:
+        parts = duration_minutes.split(':')
+        duration_minutes = str(int(parts[0]) * 60 + int(parts[1]))
+    elif duration_minutes.isdigit():
+        duration_minutes = duration_minutes
+    else:
+        duration_minutes = "90"
+    
+    return f"""
+╔══════════════════════════════════════════════════════════════════╗
+║          🏆 TREINO DE {objective.upper().ljust(20)} - {category.ljust(20)}          ║
+║          📅 Duração: {duration.ljust(28)}          ║
+╚══════════════════════════════════════════════════════════════════╝
+
+🎯 OBJETIVO
+{objective}
+
+📋 ESTRUTURA DO TREINO ({duration_minutes} min)
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 1️⃣ AQUECIMENTO (15 min)                                       │
+├─────────────────────────────────────────────────────────────────┤
+│ • Ativação muscular e mobilidade                 (5 min)        │
+│ • Exercícios de coordenação                      (5 min)        │
+│ • Passe e recepção                              (5 min)        │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 2️⃣ PARTE PRINCIPAL ({int(duration_minutes) - 30} min)                          │
+├─────────────────────────────────────────────────────────────────┤
+│ 🔹 Exercício 1: Técnica individual               (15 min)       │
+│    - Condução e controle de bola                               │
+│    - Mudanças de direção e velocidade                          │
+│                                                                 │
+│ 🔹 Exercício 2: Trabalho em duplas               (20 min)       │
+│    - Passe, recepção e movimentação                            │
+│    - Combinações e tabelas                                     │
+│                                                                 │
+│ 🔹 Exercício 3: Situações de jogo               (25 min)       │
+│    - Jogo em espaço reduzido                                   │
+│    - Aplicação dos fundamentos                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 3️⃣ FINALIZAÇÃO (15 min)                                       │
+├─────────────────────────────────────────────────────────────────┤
+│ • Jogo livre                                                   │
+│ • Ênfase no que foi trabalhado                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+📊 INDICADORES DE SUCESSO
+✅ Execução correta dos fundamentos
+✅ Tomada de decisão
+✅ Intensidade e concentração
+
+💡 DICA DO TÉCNICO
+"O treino perfeito é aquele que você dá o seu máximo. 
+Cada repetição conta."
+
+🏆 RETESP 4L - Formando campeões!
+"""
+
+def generate_chat_response(message: str, context: list) -> str:
+    """Gerar resposta inteligente para o chat com contexto do projeto 4 linhas"""
+    msg = message.lower()
+    
+    # Detectar contexto específico
+    tem_12_anos = '12' in msg or 'doze' in msg
+    tem_projeto = 'projeto' in msg or '4 linhas' in msg or '4l' in msg
+    tem_campo = 'campo' in msg or 'gramado' in msg
+    
+    # Perguntas sobre como começar
+    if any(word in msg for word in ['começar', 'comecei', 'iniciar', 'primeiro', 'começo']):
+        return """
+🏃‍♂️ **Ótimo que você quer começar bem!** 
+
+Para um jovem atleta de 12 anos no Projeto 4 Linhas, aqui está um roteiro básico:
+
+📋 **ROTINA DE TREINO PARA INICIANTE**
+
+1️⃣ **Preparação (15 min antes)**
+   • Chegue cedo para se preparar
+   • Use chuteira, caneleira e uniforme
+   • Faça um lanche leve (fruta, suco)
+
+2️⃣ **Aquecimento (15 min)**
+   • Corrida leve ao redor do campo (5 min)
+   • Alongamento dinâmico (5 min) 
+   • Toques leves na bola (5 min)
+
+3️⃣ **Fundamentos (30 min)**
+   • Passe curto com os dois pés (10 min)
+   • Controle e domínio de bola (10 min)
+   • Condução com mudanças de direção (10 min)
+
+4️⃣ **Atividade Principal (20 min)**
+   • Jogo reduzido 3x3 ou 4x4
+   • Foco em aplicar o que aprendeu
+
+5️⃣ **Finalização (10 min)**
+   • 10 chutes ao gol de diferentes posições
+   • Alongamento estático
+
+💡 **Dica do Técnico:**
+"Comece devagar, foque na técnica, não na força. 
+A repetição correta é mais importante que a quantidade!"
+
+📱 **Material sugerido:**
+• Bola tamanho 4
+• Chuteira society ou de campo
+• Caneleira
+• Garrafa de água
+• Toalha para o treino
+"""
+    
+    # Perguntas sobre o projeto 4 linhas
+    if tem_projeto or '4linhas' in msg:
+        return """
+🏟️ **PROJETO 4 LINHAS - Sua Jornada Começa Aqui!**
+
+📌 **Sobre o Projeto:**
+O Projeto 4 Linhas é uma escolinha de futebol que forma atletas desde as categorias de base (Sub-10 até Sub-20).
+
+🎯 **Para você que tem 12 anos (Sub-12):**
+• Treinos 3x por semana
+• Foco em fundamentos técnicos
+• Desenvolvimento tático gradual
+• Formação de equipe
+
+📋 **Estrutura do Treino:**
+• Duração: 1h30
+• Aquecimento: 15 min
+• Parte Técnica: 30 min
+• Parte Tática: 25 min
+• Jogo Reduzido: 20 min
+
+🌟 **O que você vai aprender:**
+• Passe com precisão
+• Controle de bola
+• Movimentação em campo
+• Trabalho em equipe
+• Respeito e disciplina
+
+💪 **Dica especial:**
+"O futebol é jogado com a cabeça e com o coração. 
+A técnica vem com a prática constante!"
+
+📱 **Próximos passos:**
+1. Esteja presente em todos os treinos
+2. Escute seus treinadores
+3. Treine em casa também
+4. Divirta-se e faça amigos!
+"""
+    
+    # Perguntas sobre idade/categoria
+    if tem_12_anos or any(word in msg for word in ['sub-12', 'sub12', 'categoria']):
+        return """
+🏆 **CATEGORIA SUB-12 (12 anos)**
+
+🎯 **O que esperar do seu treino:**
+
+📊 **Carga semanal:**
+• 3 treinos de 1h30
+• 1 jogo no fim de semana (opcional)
+
+🎯 **Habilidades a desenvolver:**
+1. Passe curto e longo com precisão
+2. Controle de bola com ambos os pés
+3. Movimentação sem bola
+4. Visão de jogo básica
+5. Finalização ao gol
+
+📋 **Exercícios recomendados:**
+1. Treino de passe em dupla (10 min)
+2. Condução com cones (15 min)
+3. Jogo de posse 5x5 (20 min)
+4. Finalização ao gol (15 min)
+
+💡 **Dica do Técnico:**
+"Aos 12 anos, o mais importante é aprender a se divertir jogando. 
+A técnica virá com a prática constante!"
+
+🏅 **Objetivos para este semestre:**
+• Melhorar a precisão dos passes (80% de acerto)
+• Aumentar o tempo de posse de bola
+• Aprender a se posicionar em campo
+• Fazer pelo menos 5 gols no campeonato
+"""
+    
+    # Perguntas sobre treino específico
+    if any(word in msg for word in ['treino', 'treinar', 'exercício', 'prática', 'treinamento']):
+        if 'finalização' in msg or 'chute' in msg or 'gol' in msg:
+            return """
+🎯 **TREINO DE FINALIZAÇÃO - SUB-12**
+
+📋 **Exercícios específicos:**
+
+1️⃣ **Chute Parado (15 min)**
+   • 10 chutes com a perna direita
+   • 10 chutes com a perna esquerda
+   • Foco: precisão no canto do gol
+
+2️⃣ **Chute em Movimento (15 min)**
+   • Receber a bola correndo e finalizar
+   • 10 repetições de cada lado
+   • Foco: controle e finalização rápida
+
+3️⃣ **Cruzamentos (10 min)**
+   • Cruzamentos da lateral
+   • Finalização de cabeça e pé
+   • 10 tentativas
+
+📊 **Meta:**
+• 5 gols em 10 tentativas
+• Chutes no gol: 70% de precisão
+
+💡 **Dica Técnica:**
+"Olhe para o gol antes de chutar. 
+Mantenha o pé firme e acompanhe o movimento!"
+"""
+        
+        elif 'posse' in msg or 'passe' in msg:
+            return """
+🔄 **TREINO DE POSSE DE BOLA - SUB-12**
+
+📋 **Exercícios específicos:**
+
+1️⃣ **Rondo 4x2 (15 min)**
+   • 4 jogadores contra 2 defensores
+   • Manter a posse por 10 passes consecutivos
+   • Trocas a cada 2 minutos
+
+2️⃣ **Jogo Posicional (20 min)**
+   • 5x5 + coringas
+   • Objetivo: 15 passes consecutivos
+   • Foco: movimentação e apoio
+
+3️⃣ **Circuito de Passe (15 min)**
+   • Passe curto em dupla
+   • Passe longo
+   • Passe com movimentação
+
+📊 **Indicadores:**
+• Precisão de passes: > 85%
+• Tempo de posse: > 60%
+• 10 passes consecutivos
+
+💡 **Dica Técnica:**
+"Mantenha a cabeça erguida e pense no próximo passe. 
+Movimente-se sempre para receber a bola!"
+"""
+        
+        else:
+            return """
+⚽ **TREINO COMPLETO - SUB-12**
+
+📋 **Estrutura do Treino (1h30):**
+
+🔹 **Aquecimento (15 min)**
+• Corrida leve e alongamento
+• Toques na bola
+
+🔹 **Técnica Individual (25 min)**
+• Controle de bola
+• Passe e recepção
+• Condução com mudanças de direção
+
+🔹 **Situações de Jogo (30 min)**
+• Jogo reduzido 4x4
+• Aplicação dos fundamentos
+• Ênfase na posse de bola
+
+🔹 **Finalização (15 min)**
+• Chutes ao gol
+• Diferentes tipos de finalização
+
+🔹 **Alongamento e Feedback (5 min)**
+
+💡 **Foco do Dia:**
+• Melhorar a técnica
+• Tomada de decisão
+• Intensidade e concentração
+
+🏆 **RETESP 4L - Formando campeões!**
+"""
+    
+    # Saudações
+    if any(word in msg for word in ['bom dia', 'boa tarde', 'boa noite', 'olá', 'oi', 'e aí']):
+        return """
+👋 **Olá, jovem atleta!**
+
+Que bom ter você aqui no Projeto 4 Linhas! 
+
+Como posso ajudar você hoje?
+• Quer saber como começar o treino?
+• Precisa de dicas técnicas?
+• Tem dúvidas sobre o projeto?
+• Quer um plano de treino específico?
+
+Estou aqui para ajudar você a se tornar um grande jogador! 💪
+"""
+    
+    # Agradecimentos
+    if any(word in msg for word in ['obrigado', 'valeu', 'gratidão', 'agradeço']):
+        return """
+😊 **Por nada!** Fico feliz em poder ajudar.
+
+Lembre-se: cada treino é uma oportunidade de melhorar.
+Continue com dedicação e paixão pelo futebol!
+
+🏆 **RETESP 4L - Formando campeões!**
+
+Qualquer dúvida, estou aqui. Basta perguntar! 💬
+"""
+    
+    # Resposta genérica quando não identifica o contexto
+    return """
+🤔 **Interessante! Conte-me mais sobre isso...**
+
+Para te ajudar melhor, me diga:
+• Você quer saber sobre treinos?
+• Precisa de dicas para sua posição?
+• Tem dúvidas sobre o projeto 4 Linhas?
+• Quer um plano de treino específico?
+
+Estou aqui para ajudar você a evoluir! 💪
+"""
+    
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8080)

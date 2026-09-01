@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { StatusBar, Image, View, Text } from 'react-native';
+import { StatusBar, Image, View, Text, Platform } from 'react-native';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 // Telas principais
@@ -24,6 +24,11 @@ import SocialScreen from './src/screens/SocialScreen';
 import TrainingsScreen from './src/screens/TrainingsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import RankingScreen from './src/screens/RankingScreen';
+
+// Telas de IA (agora só no perfil)
+import ChatScreen from './src/screens/ChatScreen';
+import AIScreen from './src/screens/AIScreen';
+import ModerationScreen from './src/screens/ModerationScreen';
 
 // Contexto para Status (Stories)
 import { StatusProvider } from './src/context/StatusContext';
@@ -64,6 +69,87 @@ function LogoTitle() {
         </Text>
       </View>
     </View>
+  );
+}
+
+// Stack para Perfil com IA e Treinos
+function ProfileStack() {
+  const { colors } = useTheme();
+  
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.header },
+        headerTintColor: colors.text,
+        headerTitleStyle: { fontWeight: 'bold' },
+        headerBackTitleVisible: false,
+        headerShadowVisible: false,
+        contentStyle: { backgroundColor: colors.background },
+      }}
+    >
+      <Stack.Screen 
+        name="ProfileMain" 
+        component={ProfileScreen} 
+        options={{ headerTitle: () => <LogoTitle /> }}
+      />
+      <Stack.Screen 
+        name="TeamsScreen" 
+        component={TeamsScreen} 
+        options={{ headerTitle: () => <LogoTitle /> }}
+      />
+      <Stack.Screen 
+        name="CoachesScreen" 
+        component={CoachesScreen} 
+        options={{ headerTitle: () => <LogoTitle /> }}
+      />
+      <Stack.Screen 
+        name="ParentsPortalScreen" 
+        component={ParentsPortalScreen} 
+        options={{ headerTitle: () => <LogoTitle /> }}
+      />
+      <Stack.Screen 
+        name="SettingsScreen" 
+        component={SettingsScreen} 
+        options={{ headerTitle: () => <LogoTitle /> }}
+      />
+      <Stack.Screen 
+        name="RankingScreen" 
+        component={RankingScreen} 
+        options={{ headerTitle: () => <LogoTitle /> }}
+      />
+      <Stack.Screen 
+        name="TrainingsScreen" 
+        component={TrainingsScreen} 
+        options={{ 
+          headerTitle: () => <LogoTitle />,
+          title: 'Treinos'
+        }}
+      />
+      <Stack.Screen 
+        name="ChatScreen" 
+        component={ChatScreen} 
+        options={{ 
+          headerTitle: () => <LogoTitle />,
+          title: 'Chat IA'
+        }}
+      />
+      <Stack.Screen 
+        name="AIScreen" 
+        component={AIScreen} 
+        options={{ 
+          headerTitle: () => <LogoTitle />,
+          title: 'IA Treinos'
+        }}
+      />
+      <Stack.Screen 
+        name="ModerationScreen" 
+        component={ModerationScreen} 
+        options={{ 
+          headerTitle: () => <LogoTitle />,
+          title: 'Moderação'
+        }}
+      />
+    </Stack.Navigator>
   );
 }
 
@@ -139,74 +225,22 @@ function MediaStack() {
   );
 }
 
-function ProfileStack() {
-  const { colors } = useTheme();
-  
+// Componente para o ícone com emoji em cima
+function TabBarIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.header },
-        headerTintColor: colors.text,
-        headerTitleStyle: { fontWeight: 'bold' },
-        headerBackTitleVisible: false,
-        headerShadowVisible: false,
-        contentStyle: { backgroundColor: colors.background },
-      }}
-    >
-      <Stack.Screen 
-        name="ProfileMain" 
-        component={ProfileScreen} 
-        options={{ headerTitle: () => <LogoTitle /> }}
-      />
-      <Stack.Screen 
-        name="TeamsScreen" 
-        component={TeamsScreen} 
-        options={{ headerTitle: () => <LogoTitle /> }}
-      />
-      <Stack.Screen 
-        name="CoachesScreen" 
-        component={CoachesScreen} 
-        options={{ headerTitle: () => <LogoTitle /> }}
-      />
-      <Stack.Screen 
-        name="ParentsPortalScreen" 
-        component={ParentsPortalScreen} 
-        options={{ headerTitle: () => <LogoTitle /> }}
-      />
-      <Stack.Screen 
-        name="SettingsScreen" 
-        component={SettingsScreen} 
-        options={{ headerTitle: () => <LogoTitle /> }}
-      />
-      <Stack.Screen 
-        name="RankingScreen" 
-        component={RankingScreen} 
-        options={{ headerTitle: () => <LogoTitle /> }}
-      />
-    </Stack.Navigator>
-  );
-}
-
-function TrainingsStack() {
-  const { colors } = useTheme();
-  
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.header },
-        headerTintColor: colors.text,
-        headerTitleStyle: { fontWeight: 'bold' },
-        headerBackTitleVisible: false,
-        headerShadowVisible: false,
-        contentStyle: { backgroundColor: colors.background },
-      }}
-    >
-      <Stack.Screen 
-        name="TrainingsList" 
-        component={TrainingsScreen} 
-        options={{ headerTitle: () => <LogoTitle /> }}
-      />
-    </Stack.Navigator>
+    <View style={{ 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      marginTop: -2,
+    }}>
+      <Text style={{ 
+        fontSize: 24, 
+        opacity: focused ? 1 : 0.6,
+        transform: [{ scale: focused ? 1.1 : 1 }],
+      }}>
+        {emoji}
+      </Text>
+    </View>
   );
 }
 
@@ -216,39 +250,31 @@ function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName = '';
-          if (route.name === 'Dashboard') {
-            iconName = focused ? 'grid' : 'grid-outline';
-          } else if (route.name === 'Treinos') {
-            iconName = focused ? 'fitness' : 'fitness-outline';
-          } else if (route.name === 'Atletas') {
-            iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Chamada') {
-            iconName = focused ? 'checkbox' : 'checkbox-outline';
-          } else if (route.name === 'Vídeos') {
-            iconName = focused ? 'videocam' : 'videocam-outline';
-          } else if (route.name === 'Social') {
-            iconName = focused ? 'share-social' : 'share-social-outline';
-          } else if (route.name === 'Perfil') {
-            iconName = focused ? 'person' : 'person-outline';
-          } else if (route.name === 'Ranking') {
-            iconName = focused ? 'trophy' : 'trophy-outline';
-          }
-          return <Icon name={iconName} size={size} color={color} />;
+        tabBarIcon: ({ focused }) => {
+          let emoji = '';
+          if (route.name === 'Dashboard') emoji = '📊';
+          else if (route.name === 'Atletas') emoji = '👥';
+          else if (route.name === 'Chamada') emoji = '✅';
+          else if (route.name === 'Vídeos') emoji = '🎬';
+          else if (route.name === 'Social') emoji = '📱';
+          else if (route.name === 'Ranking') emoji = '🏆';
+          else if (route.name === 'Perfil') emoji = '👤';
+          return <TabBarIcon emoji={emoji} focused={focused} />;
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.tabBar,
           borderTopColor: colors.border,
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+          paddingTop: 6,
+          height: Platform.OS === 'ios' ? 75 : 65,
         },
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '500',
+          marginTop: 0,
+          paddingBottom: 2,
         },
         headerStyle: {
           backgroundColor: colors.header,
@@ -269,15 +295,6 @@ function MainTabs() {
         options={{ 
           headerShown: false,
           tabBarLabel: 'Dashboard',
-        }}
-      />
-      
-      <Tab.Screen 
-        name="Treinos" 
-        component={TrainingsStack} 
-        options={{ 
-          headerShown: false,
-          tabBarLabel: 'Treinos',
         }}
       />
       
@@ -322,7 +339,7 @@ function MainTabs() {
         component={RankingScreen} 
         options={{ 
           headerTitle: () => <LogoTitle />,
-          tabBarLabel: '🏆 Ranking',
+          tabBarLabel: 'Ranking',
         }}
       />
       

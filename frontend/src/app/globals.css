@@ -3,75 +3,51 @@
 @tailwind utilities;
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --bg-primary: #0D1117;
-  --bg-card: #161B22;
-  --border-color: #30363D;
-  --text-primary: #FFFFFF;
-  --text-secondary: #9CA3AF;
-  --bg-input: #0D1117;
-  --bg-hover: #21262D;
-}
-
-/* TEMA CLARO - Cinza clarinho e suave */
-.light {
-  --bg-primary: #f0f2f5;
-  --bg-card: #ffffff;
-  --border-color: #d1d5db;
-  --text-primary: #1a1a2e;
-  --text-secondary: #6b7280;
-  --bg-input: #f8f9fa;
-  --bg-hover: #e5e7eb;
-}
-
-/* TEMA ESCURO - Original */
-.dark {
-  --bg-primary: #0D1117;
-  --bg-card: #161B22;
-  --border-color: #30363D;
-  --text-primary: #FFFFFF;
-  --text-secondary: #9CA3AF;
-  --bg-input: #0D1117;
-  --bg-hover: #21262D;
+  --background: #0D1117;
+  --foreground: #ffffff;
 }
 
 body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  min-height: 100vh;
+  color: var(--foreground);
+  background: var(--background);
 }
-
-/* Classes de utilidade */
-.bg-app { background-color: var(--bg-primary); }
-.bg-card { background-color: var(--bg-card); }
-.bg-input { background-color: var(--bg-input); }
-.border-card { border-color: var(--border-color); }
-.text-primary { color: var(--text-primary); }
-.text-secondary { color: var(--text-secondary); }
-.hover-bg { background-color: var(--bg-hover); }
 
 /* Scrollbar personalizada */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: var(--bg-card); }
-::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
-
-/* Ajustes para o tema claro */
-.light .shadow-card {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.light input,
-.light textarea,
-.light select {
-  background-color: var(--bg-input);
-  border-color: var(--border-color);
-  color: var(--text-primary);
+::-webkit-scrollbar-track {
+  background: #0D1117;
 }
 
-.light input:focus,
-.light textarea:focus,
-.light select:focus {
-  border-color: #4ade80;
-  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
+::-webkit-scrollbar-thumb {
+  background: #30363D;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #484F58;
+}
+
+/* Animações */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.delay-75 {
+  animation-delay: 75ms;
+}
+
+.delay-150 {
+  animation-delay: 150ms;
+}
+
+/* Transições */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
 }

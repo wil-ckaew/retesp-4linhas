@@ -27,17 +27,8 @@ interface Athlete {
   medical_form_url: string | null;
 }
 
-// Tipo para a navegação
-type RootStackParamList = {
-  AthletesList: undefined;
-  AthleteDetails: { id: string };
-  CreateAthlete: undefined;
-  EditAthlete: { id: string };
-  Main: undefined;
-};
-
 export default function AthletesScreen() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation();
   const { colors, isDark } = useTheme();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [filteredAthletes, setFilteredAthletes] = useState<Athlete[]>([]);
@@ -445,10 +436,9 @@ export default function AthletesScreen() {
       if (!res.ok) throw new Error(`Erro ${res.status}`);
       const data = await res.json();
       console.log('📥 Atletas recebidos:', data.length);
+      // Log para verificar a URL da imagem
       data.forEach((a: Athlete) => {
-        if (a.avatar_url) {
-          console.log(`📸 ${a.name}: ${a.avatar_url}`);
-        }
+        console.log(`📸 ${a.name}: avatar_url = ${a.avatar_url}`);
       });
       setAthletes(data);
       setFilteredAthletes(data);
@@ -558,40 +548,47 @@ export default function AthletesScreen() {
     return age;
   };
 
-  const getAvatarUrl = (avatar_url: string | null): string | null => {
+  // Função CORRIGIDA para obter a URL da imagem
+  const getAvatarUrl = (avatar_url: string | null) => {
     if (!avatar_url) return null;
     
-    console.log(`🔍 Processando avatar_url: ${avatar_url}`);
+    console.log('🔍 Processando avatar_url:', avatar_url);
     
+    // Caso 1: URL já completa
     if (avatar_url.startsWith('http://') || avatar_url.startsWith('https://')) {
+      console.log('✅ URL completa:', avatar_url);
       return avatar_url;
     }
     
+    // Caso 2: Começa com /uploads/ (formato esperado)
     if (avatar_url.startsWith('/uploads/')) {
       const fullUrl = `${API_URL}${avatar_url}`;
-      console.log(`✅ URL completa: ${fullUrl}`);
+      console.log('✅ URL com /uploads/:', fullUrl);
       return fullUrl;
     }
     
+    // Caso 3: Começa com uploads/ (sem barra)
     if (avatar_url.startsWith('uploads/')) {
       const fullUrl = `${API_URL}/${avatar_url}`;
-      console.log(`✅ URL completa: ${fullUrl}`);
+      console.log('✅ URL com uploads/:', fullUrl);
       return fullUrl;
     }
     
+    // Caso 4: Começa com / (mas não /uploads/)
     if (avatar_url.startsWith('/')) {
       const fullUrl = `${API_URL}${avatar_url}`;
-      console.log(`✅ URL completa: ${fullUrl}`);
+      console.log('✅ URL com /:', fullUrl);
       return fullUrl;
     }
     
+    // Caso 5: Nome de arquivo simples
     const fullUrl = `${API_URL}/uploads/${avatar_url}`;
-    console.log(`✅ URL completa (fallback): ${fullUrl}`);
+    console.log('✅ URL com nome de arquivo:', fullUrl);
     return fullUrl;
   };
 
-  const handleImageError = (id: string, url: string) => {
-    console.log(`❌ Erro ao carregar imagem: ${url}`);
+  const handleImageError = (id: string) => {
+    console.log(`❌ Erro ao carregar imagem do atleta ${id}`);
     setImageErrors(prev => ({ ...prev, [id]: true }));
   };
 
@@ -601,8 +598,10 @@ export default function AthletesScreen() {
     const avatarUrl = getAvatarUrl(item.avatar_url);
     const hasError = imageErrors[item.id];
 
-    // Mostrar iniciais se não tiver foto, se houve erro ou se a URL for null
+    // Mostrar iniciais se não tiver foto ou se houve erro
     const showInitials = !avatarUrl || hasError;
+
+    console.log(`🖼️ ${item.name}: showInitials=${showInitials}, avatarUrl=${avatarUrl}`);
 
     return (
       <View style={styles.athleteCard}>
@@ -618,9 +617,9 @@ export default function AthletesScreen() {
               </Text>
             ) : (
               <Image
-                source={{ uri: avatarUrl as string }} // Forçar tipo string pois já verificamos que não é null
+                source={{ uri: avatarUrl }}
                 style={styles.avatarImage}
-                onError={() => handleImageError(item.id, avatarUrl as string)}
+                onError={() => handleImageError(item.id)}
               />
             )}
           </View>
@@ -789,9 +788,9 @@ export default function AthletesScreen() {
                 <View style={styles.modalAvatarContainer}>
                   {selectedAthlete.avatar_url ? (
                     <Image
-                      source={{ uri: getAvatarUrl(selectedAthlete.avatar_url) as string }}
+                      source={{ uri: getAvatarUrl(selectedAthlete.avatar_url) }}
                       style={styles.modalAvatar}
-                      onError={(e) => console.log('❌ Erro no modal:', e.nativeEvent.error)}
+                      onError={() => console.log('Erro no modal')}
                     />
                   ) : (
                     <View style={styles.modalAvatarPlaceholder}>

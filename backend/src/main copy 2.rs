@@ -993,7 +993,6 @@ async fn delete_expired_stories(pool: web::Data<PgPool>) -> impl Responder {
 }
 
 // --- UPLOAD ---
-// --- UPLOAD CORRIGIDO ---
 async fn upload_media(mut payload: Multipart, pool: web::Data<PgPool>) -> impl Responder {
     let upload_dir = "./uploads";
     if !Path::new(upload_dir).exists() {
@@ -1033,31 +1032,7 @@ async fn upload_media(mut payload: Multipart, pool: web::Data<PgPool>) -> impl R
         None => return HttpResponse::BadRequest().body("Nenhum arquivo enviado"),
     };
 
-    // CORREÇÃO: Usar o nome do arquivo enviado ou gerar um nome único
-    let filename = match filename {
-        Some(fname) => {
-            // Limpar caracteres especiais e espaços
-            let clean = fname
-                .replace(" ", "_")
-                .replace("%20", "_")
-                .replace(":", "_")
-                .replace("/", "_")
-                .replace("\\", "_")
-                .replace("(", "_")
-                .replace(")", "_")
-                .replace("[", "_")
-                .replace("]", "_");
-            
-            // Se não tiver extensão, adicionar .bin
-            if !clean.contains('.') {
-                format!("{}.bin", clean)
-            } else {
-                clean
-            }
-        }
-        None => format!("file_{}.bin", Uuid::new_v4())
-    };
-
+    let filename = filename.unwrap_or_else(|| "file.bin".to_string());
     let file_path = format!("{}/{}", upload_dir, filename);
 
     if let Err(e) = fs::write(&file_path, file_data) {
@@ -1070,8 +1045,6 @@ async fn upload_media(mut payload: Multipart, pool: web::Data<PgPool>) -> impl R
         "video"
     } else if filename.ends_with(".pdf") {
         "pdf"
-    } else if filename.ends_with(".jpg") || filename.ends_with(".jpeg") || filename.ends_with(".png") || filename.ends_with(".gif") || filename.ends_with(".webp") {
-        "photo"
     } else {
         "photo"
     };
