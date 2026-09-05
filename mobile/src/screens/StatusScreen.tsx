@@ -1,3 +1,4 @@
+//mobile/src/screens/StatusScreen.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -34,7 +35,8 @@ export default function StatusScreen() {
   const [progress, setProgress] = useState(0);
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // CORREÇÃO: Usar ReturnType<typeof setInterval> em vez de NodeJS.Timeout
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const openStory = (story: Story) => {
     setSelectedStory(story);
@@ -49,6 +51,7 @@ export default function StatusScreen() {
     StatusBar.setHidden(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
+      timerRef.current = null;
     }
   };
 
@@ -70,6 +73,7 @@ export default function StatusScreen() {
     if (modalVisible && selectedStory && selectedStory.type === 'image') {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
       setProgress(0);
       timerRef.current = setInterval(() => {
@@ -85,6 +89,7 @@ export default function StatusScreen() {
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
   }, [modalVisible, selectedStory]);
@@ -114,12 +119,33 @@ export default function StatusScreen() {
     </TouchableOpacity>
   );
 
+  // Se não houver stories, exibe uma mensagem
+  if (stories.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Icon name="images-outline" size={64} color="#4B5563" />
+        <Text style={styles.emptyTitle}>📸 Nenhum Story</Text>
+        <Text style={styles.emptyText}>Compartilhe um momento da equipe</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>📸 Stories</Text>
+        <TouchableOpacity onPress={() => {
+          // Atualizar stories
+        }}>
+          <Icon name="refresh" size={24} color="#9CA3AF" />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.storiesContainer}
+        contentContainerStyle={styles.storiesContent}
       >
         {stories.map(renderStoryCircle)}
       </ScrollView>
@@ -161,7 +187,7 @@ export default function StatusScreen() {
                   onEnd={() => nextStory()}
                   onError={(error) => {
                     console.log('Erro no vídeo:', error);
-                    Alert.alert('Erro', 'Não foi possível carregar o vídeo');
+                    Alert.alert('❌ Erro', 'Não foi possível carregar o vídeo');
                     closeStory();
                   }}
                   bufferConfig={{
@@ -180,8 +206,10 @@ export default function StatusScreen() {
               )}
               
               <View style={styles.storyHeader}>
-                <Text style={styles.storyUser}>{selectedStory.user}</Text>
-                <Text style={styles.storyTime}>Agora</Text>
+                <Text style={styles.storyUser}>
+                  <Icon name="person" size={16} color="#FFFFFF" /> {selectedStory.user}
+                </Text>
+                <Text style={styles.storyTime}>🕐 Agora</Text>
               </View>
 
               {/* Barra de Progresso */}
@@ -203,11 +231,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0D1117',
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#30363D',
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
   storiesContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#30363D',
+  },
+  storiesContent: {
+    paddingRight: 16,
   },
   storyCircle: {
     alignItems: 'center',
@@ -294,7 +338,7 @@ const styles = StyleSheet.create({
   },
   storyUser: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   storyTime: {
@@ -313,5 +357,24 @@ const styles = StyleSheet.create({
   progressBar: {
     height: '100%',
     backgroundColor: '#3B82F6',
+  },
+  emptyContainer: {
+    flex: 1,
+    backgroundColor: '#0D1117',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 16,
+  },
+  emptyText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

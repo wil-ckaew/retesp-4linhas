@@ -1,3 +1,4 @@
+//mobile/App.tsx
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -25,7 +26,7 @@ import TrainingsScreen from './src/screens/TrainingsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import RankingScreen from './src/screens/RankingScreen';
 
-// Telas de IA (agora só no perfil)
+// Telas de IA
 import ChatScreen from './src/screens/ChatScreen';
 import AIScreen from './src/screens/AIScreen';
 import ModerationScreen from './src/screens/ModerationScreen';
@@ -82,7 +83,6 @@ function ProfileStack() {
         headerStyle: { backgroundColor: colors.header },
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: 'bold' },
-        headerBackTitleVisible: false,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
       }}
@@ -153,6 +153,7 @@ function ProfileStack() {
   );
 }
 
+// Stack para Atletas
 function AthletesStack() {
   const { colors } = useTheme();
   
@@ -162,7 +163,6 @@ function AthletesStack() {
         headerStyle: { backgroundColor: colors.header },
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: 'bold' },
-        headerBackTitleVisible: false,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
       }}
@@ -175,13 +175,17 @@ function AthletesStack() {
       <Stack.Screen 
         name="AthleteDetails" 
         component={AthleteDetailsScreen} 
-        options={{ headerTitle: () => <LogoTitle /> }}
+        options={{ 
+          headerTitle: () => <LogoTitle />,
+          title: 'Detalhes do Atleta'
+        }}
       />
       <Stack.Screen 
         name="CreateAthlete" 
         component={CreateAthleteScreen} 
         options={{ 
           headerTitle: () => <LogoTitle />,
+          title: 'Novo Atleta',
           presentation: 'modal',
         }}
       />
@@ -190,7 +194,17 @@ function AthletesStack() {
         component={EditAthleteScreen} 
         options={{ 
           headerTitle: () => <LogoTitle />,
+          title: 'Editar Atleta',
           presentation: 'modal',
+        }}
+      />
+      {/* CORREÇÃO: Adicionar AttendanceScreen dentro do Stack do Atletas */}
+      <Stack.Screen 
+        name="Attendance" 
+        component={AttendanceScreen} 
+        options={{ 
+          headerTitle: () => <LogoTitle />,
+          title: 'Chamada'
         }}
       />
     </Stack.Navigator>
@@ -206,7 +220,6 @@ function MediaStack() {
         headerStyle: { backgroundColor: colors.header },
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: 'bold' },
-        headerBackTitleVisible: false,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
       }}
@@ -225,8 +238,8 @@ function MediaStack() {
   );
 }
 
-// Componente para o ícone com emoji em cima
-function TabBarIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
+// Componente para o ícone com EMOJI e LABEL
+function TabBarIcon({ emoji, label, focused, color }: { emoji: string; label: string; focused: boolean; color: string }) {
   return (
     <View style={{ 
       alignItems: 'center', 
@@ -234,11 +247,20 @@ function TabBarIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
       marginTop: -2,
     }}>
       <Text style={{ 
-        fontSize: 24, 
+        fontSize: 22, 
         opacity: focused ? 1 : 0.6,
         transform: [{ scale: focused ? 1.1 : 1 }],
       }}>
         {emoji}
+      </Text>
+      <Text style={{
+        fontSize: 10,
+        fontWeight: '500',
+        color: color,
+        marginTop: 2,
+        textAlign: 'center',
+      }}>
+        {label}
       </Text>
     </View>
   );
@@ -250,16 +272,17 @@ function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused }) => {
+        tabBarIcon: ({ focused, color }) => {
           let emoji = '';
-          if (route.name === 'Dashboard') emoji = '📊';
-          else if (route.name === 'Atletas') emoji = '👥';
-          else if (route.name === 'Chamada') emoji = '✅';
-          else if (route.name === 'Vídeos') emoji = '🎬';
-          else if (route.name === 'Social') emoji = '📱';
-          else if (route.name === 'Ranking') emoji = '🏆';
-          else if (route.name === 'Perfil') emoji = '👤';
-          return <TabBarIcon emoji={emoji} focused={focused} />;
+          let label = '';
+          if (route.name === 'Dashboard') { emoji = '📊'; label = 'Dashboard'; }
+          else if (route.name === 'Atletas') { emoji = '👥'; label = 'Atletas'; }
+          else if (route.name === 'Chamada') { emoji = '✅'; label = 'Chamada'; }
+          else if (route.name === 'Vídeos') { emoji = '🎬'; label = 'Vídeos'; }
+          else if (route.name === 'Social') { emoji = '📱'; label = 'Social'; }
+          else if (route.name === 'Ranking') { emoji = '🏆'; label = 'Ranking'; }
+          else if (route.name === 'Perfil') { emoji = '👤'; label = 'Perfil'; }
+          return <TabBarIcon emoji={emoji} label={label} focused={focused} color={color} />;
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
@@ -270,12 +293,7 @@ function MainTabs() {
           paddingTop: 6,
           height: Platform.OS === 'ios' ? 75 : 65,
         },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '500',
-          marginTop: 0,
-          paddingBottom: 2,
-        },
+        tabBarLabel: () => null,
         headerStyle: {
           backgroundColor: colors.header,
         },
@@ -294,7 +312,6 @@ function MainTabs() {
         component={DashboardScreen} 
         options={{ 
           headerShown: false,
-          tabBarLabel: 'Dashboard',
         }}
       />
       
@@ -303,7 +320,6 @@ function MainTabs() {
         component={AthletesStack} 
         options={{ 
           headerShown: false,
-          tabBarLabel: 'Atletas',
         }}
       />
       
@@ -312,7 +328,6 @@ function MainTabs() {
         component={AttendanceScreen} 
         options={{ 
           headerTitle: () => <LogoTitle />,
-          tabBarLabel: 'Chamada',
         }}
       />
       
@@ -321,7 +336,6 @@ function MainTabs() {
         component={VideosScreen} 
         options={{ 
           headerShown: false,
-          tabBarLabel: 'Vídeos',
         }}
       />
       
@@ -330,7 +344,6 @@ function MainTabs() {
         component={SocialScreen} 
         options={{ 
           headerTitle: () => <LogoTitle />,
-          tabBarLabel: 'Social',
         }}
       />
       
@@ -339,7 +352,6 @@ function MainTabs() {
         component={RankingScreen} 
         options={{ 
           headerTitle: () => <LogoTitle />,
-          tabBarLabel: 'Ranking',
         }}
       />
       
@@ -348,7 +360,6 @@ function MainTabs() {
         component={ProfileStack} 
         options={{ 
           headerShown: false,
-          tabBarLabel: 'Perfil',
         }}
       />
     </Tab.Navigator>
@@ -366,7 +377,6 @@ function AppContent() {
           headerStyle: { backgroundColor: colors.header },
           headerTintColor: colors.text,
           headerTitleStyle: { fontWeight: 'bold' },
-          headerBackTitleVisible: false,
           headerShadowVisible: false,
           contentStyle: { backgroundColor: colors.background },
         }}

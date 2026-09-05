@@ -1,3 +1,4 @@
+//mobile/src/screens/SocialScreen.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -10,10 +11,12 @@ import {
   Image,
   TextInput,
   Alert,
-  Modal,
   Linking,
   Dimensions,
   Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
+  Modal,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { API_URL } from '../services/api';
@@ -56,6 +59,13 @@ interface Story {
   expiresAt?: number;
 }
 
+interface Comment {
+  id: string;
+  author: string;
+  text: string;
+  time: string;
+}
+
 export default function SocialScreen() {
   const { colors, isDark } = useTheme();
   const { stories, addStoryToBackend, fetchStories, deleteExpiredStories } = useStatus();
@@ -75,6 +85,14 @@ export default function SocialScreen() {
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [likes, setLikes] = useState<Record<string, number>>({});
   const [videoError, setVideoError] = useState(false);
+  
+  // Estados para comentários
+  const [commentModalVisible, setCommentModalVisible] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentPost, setCommentPost] = useState<Post | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [sendingComment, setSendingComment] = useState(false);
+  const commentInputRef = useRef<TextInput>(null);
 
   const styles = StyleSheet.create({
     container: {
@@ -146,34 +164,6 @@ export default function SocialScreen() {
       backgroundColor: colors.card,
       justifyContent: 'center',
       alignItems: 'center',
-    },
-    storyRETESP: {
-      width: '100%',
-      height: '100%',
-      borderRadius: 30,
-      backgroundColor: '#1A1A2E',
-      justifyContent: 'center',
-      alignItems: 'center',
-      position: 'relative',
-    },
-    storyRETESPText: {
-      color: '#FF4444',
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    storyRETESPBadge: {
-      position: 'absolute',
-      bottom: 2,
-      right: 2,
-      backgroundColor: '#00FF88',
-      borderRadius: 8,
-      paddingHorizontal: 4,
-      paddingVertical: 1,
-    },
-    storyRETESPBadgeText: {
-      color: '#1A1A2E',
-      fontSize: 6,
-      fontWeight: 'bold',
     },
     storyAvatarImage: {
       width: '100%',
@@ -252,10 +242,6 @@ export default function SocialScreen() {
       justifyContent: 'center',
       alignItems: 'center',
     },
-    createPostAvatarText: {
-      color: '#FFFFFF',
-      fontSize: 18,
-    },
     postInput: {
       flex: 1,
       color: colors.text,
@@ -269,7 +255,6 @@ export default function SocialScreen() {
       flexWrap: 'wrap',
       gap: 8,
       marginVertical: 8,
-      marginLeft: 48,
     },
     mediaPreview: {
       position: 'relative',
@@ -297,6 +282,7 @@ export default function SocialScreen() {
       right: 4,
       backgroundColor: 'rgba(0,0,0,0.7)',
       borderRadius: 12,
+      padding: 2,
     },
     postActions: {
       flexDirection: 'row',
@@ -306,29 +292,57 @@ export default function SocialScreen() {
       paddingTop: 12,
       borderTopWidth: 1,
       borderTopColor: colors.border,
-      marginLeft: 48,
     },
-    mediaButtons: {
-      flexDirection: 'row',
-      gap: 16,
-    },
-    postRightActions: {
+    actionButtonsRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
+      gap: 8,
+      flex: 1,
+    },
+    mediaButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 8,
+      gap: 4,
+      borderWidth: 1,
+      flex: 1,
+    },
+    mediaButtonImage: {
+      backgroundColor: colors.primary + '15',
+      borderColor: colors.primary + '40',
+    },
+    mediaButtonVideo: {
+      backgroundColor: '#8B5CF615',
+      borderColor: '#8B5CF640',
+    },
+    mediaButtonText: {
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    mediaButtonTextImage: {
+      color: colors.primary,
+    },
+    mediaButtonTextVideo: {
+      color: '#8B5CF6',
     },
     postButton: {
       backgroundColor: colors.primary,
-      paddingHorizontal: 20,
+      paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 8,
-      minWidth: 80,
       alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 4,
+      flex: 1,
     },
     postButtonText: {
       color: '#FFFFFF',
       fontWeight: '600',
-      fontSize: 14,
+      fontSize: 13,
     },
     postCard: {
       backgroundColor: colors.card,
@@ -423,7 +437,7 @@ export default function SocialScreen() {
     },
     postFooter: {
       flexDirection: 'row',
-      gap: 20,
+      gap: 12,
       borderTopWidth: 1,
       borderTopColor: colors.border,
       paddingTop: 12,
@@ -431,11 +445,16 @@ export default function SocialScreen() {
     postAction: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 8,
       gap: 6,
+      flex: 1,
     },
     postActionText: {
-      color: colors.textSecondary,
-      fontSize: 14,
+      fontSize: 13,
+      fontWeight: '500',
     },
     footerSpacer: {
       height: 20,
@@ -582,38 +601,24 @@ export default function SocialScreen() {
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'center',
-      gap: 16,
+      gap: 12,
     },
     shareOption: {
       alignItems: 'center',
-      width: 70,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      minWidth: 60,
+      backgroundColor: colors.hover,
     },
-    shareIcon: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 6,
-    },
-    statusIcon: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      overflow: 'hidden',
-    },
-    statusGradient: {
-      width: '100%',
-      height: '100%',
-      backgroundColor: '#8B5CF6',
-      borderWidth: 2,
-      borderColor: '#FFFFFF',
-      borderRadius: 16,
-    },
-    shareLabel: {
+    shareOptionText: {
       color: colors.textSecondary,
       fontSize: 11,
+      marginTop: 4,
       textAlign: 'center',
+    },
+    shareIconEmoji: {
+      fontSize: 28,
     },
     shareCancelButton: {
       marginTop: 16,
@@ -625,6 +630,122 @@ export default function SocialScreen() {
       color: colors.textSecondary,
       fontSize: 16,
       textAlign: 'center',
+      fontWeight: '500',
+    },
+    // ==================== ESTILOS DO MODAL DE COMENTÁRIOS - CUSTOM ====================
+    commentOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+      zIndex: 999,
+    },
+    commentModalContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 20,
+      maxHeight: '80%',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    commentModalTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    commentList: {
+      maxHeight: 200,
+      marginBottom: 12,
+    },
+    commentItem: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      gap: 8,
+    },
+    commentAvatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    commentAvatarText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: 'bold',
+    },
+    commentContent: {
+      flex: 1,
+    },
+    commentAuthor: {
+      color: colors.text,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    commentTextStyle: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    commentInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: 12,
+    },
+    commentInput: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      color: colors.text,
+      fontSize: 15,
+      minHeight: 44,
+    },
+    commentSendButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 6,
+      minWidth: 80,
+      height: 44,
+    },
+    commentSendText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    commentCloseButton: {
+      marginTop: 8,
+      paddingVertical: 10,
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    commentCloseText: {
+      color: colors.textSecondary,
+      fontSize: 14,
       fontWeight: '500',
     },
   });
@@ -718,7 +839,7 @@ export default function SocialScreen() {
       }
     } catch (error) {
       console.error('Erro ao selecionar imagem:', error);
-      Alert.alert('Erro', 'Não foi possível selecionar a imagem');
+      Alert.alert('❌ Erro', 'Não foi possível selecionar a imagem');
     }
   };
 
@@ -759,7 +880,7 @@ export default function SocialScreen() {
       }
     } catch (error) {
       console.error('Erro ao selecionar vídeo:', error);
-      Alert.alert('Erro', 'Não foi possível selecionar o vídeo');
+      Alert.alert('❌ Erro', 'Não foi possível selecionar o vídeo');
     }
   };
 
@@ -805,7 +926,7 @@ export default function SocialScreen() {
       return response;
     } catch (error) {
       console.error('Erro no upload:', error);
-      Alert.alert('Erro', 'Não foi possível fazer o upload');
+      Alert.alert('❌ Erro', 'Não foi possível fazer o upload');
       return null;
     } finally {
       setUploading(false);
@@ -814,7 +935,7 @@ export default function SocialScreen() {
 
   const createPost = async () => {
     if (!newPost.content.trim() && !selectedImage && !selectedVideo) {
-      Alert.alert('Erro', 'Escreva algo ou anexe uma mídia');
+      Alert.alert('❌ Erro', 'Escreva algo ou anexe uma mídia');
       return;
     }
 
@@ -825,15 +946,15 @@ export default function SocialScreen() {
     try {
       if (selectedImage) {
         const result = await uploadMedia(selectedImage, 'image');
-        if (result && result.url) {
-          image_url = result.url;
+        if (result && (result as any).url) {
+          image_url = (result as any).url;
         }
       }
 
       if (selectedVideo) {
         const result = await uploadMedia(selectedVideo, 'video');
-        if (result && result.url) {
-          video_url = result.url;
+        if (result && (result as any).url) {
+          video_url = (result as any).url;
         }
       }
 
@@ -851,17 +972,17 @@ export default function SocialScreen() {
       });
 
       if (res.ok) {
-        Alert.alert('Sucesso', 'Postagem criada!');
+        Alert.alert('✅ Sucesso', 'Postagem criada!');
         setNewPost({ content: '', team: 'Sub-12' });
         setSelectedImage(null);
         setSelectedVideo(null);
         fetchPosts();
       } else {
-        Alert.alert('Erro', 'Não foi possível criar a postagem');
+        Alert.alert('❌ Erro', 'Não foi possível criar a postagem');
       }
     } catch (error) {
       console.error('Erro:', error);
-      Alert.alert('Erro', 'Erro de comunicação');
+      Alert.alert('❌ Erro', 'Erro de comunicação');
     } finally {
       setCreating(false);
     }
@@ -887,6 +1008,157 @@ export default function SocialScreen() {
     setShareModalVisible(true);
   };
 
+  // ========== FUNÇÕES DE COMENTÁRIOS ==========
+  
+  const openCommentModal = (post: Post) => {
+    setCommentPost(post);
+    setCommentText('');
+    setComments([
+      { id: '1', author: 'João Silva', text: '👏 Excelente postagem!', time: '2h' },
+      { id: '2', author: 'Maria Santos', text: '👍 Muito bom!', time: '1h' },
+    ]);
+    setCommentModalVisible(true);
+    setTimeout(() => {
+      if (commentInputRef.current) {
+        commentInputRef.current.focus();
+      }
+    }, 300);
+  };
+
+  const sendComment = () => {
+    if (!commentText.trim()) {
+      Alert.alert('❌ Erro', 'Digite uma mensagem');
+      return;
+    }
+
+    setSendingComment(true);
+    try {
+      const newComment: Comment = {
+        id: Date.now().toString(),
+        author: 'Você',
+        text: commentText.trim(),
+        time: 'Agora',
+      };
+      setComments(prev => [newComment, ...prev]);
+      setCommentText('');
+      
+      if (commentPost) {
+        const updatedPosts = posts.map(p => 
+          p.id === commentPost.id ? { ...p, comments: (p.comments || 0) + 1 } : p
+        );
+        setPosts(updatedPosts);
+        setFilteredPosts(updatedPosts);
+      }
+      
+      Alert.alert('✅ Sucesso', 'Comentário enviado!');
+    } catch (error) {
+      Alert.alert('❌ Erro', 'Não foi possível enviar o comentário');
+    } finally {
+      setSendingComment(false);
+    }
+  };
+
+  // ========== FUNÇÕES DE COMPARTILHAMENTO ==========
+
+  const shareToWhatsApp = async (post: Post) => {
+    try {
+      let text = `📱 Confira esta postagem do RETESP 4L!\n\n${post.content}\n\n🏆 RETESP 4L - Gestão Esportiva`;
+      
+      if (post.video_url) {
+        const videoFullUrl = `${API_URL}${post.video_url}`;
+        text = `${text}\n\n🎬 Link do vídeo: ${videoFullUrl}`;
+      } else if (post.image_url) {
+        const imageFullUrl = `${API_URL}${post.image_url}`;
+        text = `${text}\n\n📸 Imagem: ${imageFullUrl}`;
+      }
+
+      const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+      const canOpen = await Linking.canOpenURL(whatsappUrl);
+      if (canOpen) {
+        await Linking.openURL(whatsappUrl);
+      } else {
+        Alert.alert('Erro', 'WhatsApp não está instalado');
+      }
+      setShareModalVisible(false);
+    } catch (error) {
+      Alert.alert('❌ Erro', 'Não foi possível abrir o WhatsApp');
+    }
+  };
+
+  const shareToInstagram = async (post: Post) => {
+    try {
+      let text = `📱 Confira esta postagem do RETESP 4L!\n\n${post.content}`;
+      
+      if (post.video_url) {
+        const videoFullUrl = `${API_URL}${post.video_url}`;
+        text = `${text}\n\n🎬 Vídeo: ${videoFullUrl}`;
+      } else if (post.image_url) {
+        const imageFullUrl = `${API_URL}${post.image_url}`;
+        text = `${text}\n\n📸 Imagem: ${imageFullUrl}`;
+      }
+
+      const url = `instagram://share?text=${encodeURIComponent(text)}`;
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Instagram não instalado', 'Por favor, instale o Instagram');
+      }
+      setShareModalVisible(false);
+    } catch (error) {
+      Alert.alert('❌ Erro', 'Não foi possível abrir o Instagram');
+    }
+  };
+
+  const shareToFacebook = async (post: Post) => {
+    try {
+      let text = `📱 Confira esta postagem do RETESP 4L!\n\n${post.content}`;
+      let mediaUrl = 'http://localhost:3001/social';
+      
+      if (post.video_url) {
+        mediaUrl = `${API_URL}${post.video_url}`;
+        text = `${text}\n\n🎬 Vídeo: ${mediaUrl}`;
+      } else if (post.image_url) {
+        mediaUrl = `${API_URL}${post.image_url}`;
+        text = `${text}\n\n📸 Imagem: ${mediaUrl}`;
+      }
+
+      const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(mediaUrl)}&quote=${encodeURIComponent(text)}`;
+      await Linking.openURL(url);
+      setShareModalVisible(false);
+    } catch (error) {
+      Alert.alert('❌ Erro', 'Não foi possível abrir o Facebook');
+    }
+  };
+
+  const shareViaLink = async (post: Post) => {
+    try {
+      let link = `http://localhost:3001/social?post=${post.id}`;
+      let message = `🔗 Link da postagem:\n\n${link}`;
+      
+      if (post.video_url) {
+        const videoFullUrl = `${API_URL}${post.video_url}`;
+        message = `${message}\n\n🎬 Vídeo: ${videoFullUrl}`;
+      } else if (post.image_url) {
+        const imageFullUrl = `${API_URL}${post.image_url}`;
+        message = `${message}\n\n📸 Imagem: ${imageFullUrl}`;
+      }
+
+      Alert.alert('🔗 Link da postagem', message, [
+        { 
+          text: '📋 Copiar', 
+          onPress: () => {
+            Alert.alert('✅ Copiado!', 'Link copiado para a área de transferência');
+          } 
+        },
+        { text: 'OK' },
+      ]);
+      setShareModalVisible(false);
+    } catch (error) {
+      Alert.alert('❌ Erro', 'Não foi possível compartilhar o link');
+    }
+  };
+
   const shareToStatus = async (post: Post) => {
     const hasVideo = !!post.video_url;
     const hasImage = !!post.image_url && !hasVideo;
@@ -896,15 +1168,10 @@ export default function SocialScreen() {
       user: 'Você',
       type: hasVideo ? 'video' : 'image',
       image: hasImage ? `${API_URL}${post.image_url}` : undefined,
-      video_url: hasVideo ? post.video_url : undefined,
+      video_url: hasVideo ? post.video_url || undefined : undefined,
       isFromRETESP: false,
       expiresAt: Date.now() + 24 * 60 * 60 * 1000,
     };
-
-    if (hasVideo && !newStory.video_url) {
-      newStory.video_url = post.video_url;
-      newStory.type = 'video';
-    }
 
     await addStoryToBackend(newStory);
     setShareModalVisible(false);
@@ -922,41 +1189,6 @@ export default function SocialScreen() {
         }
       ]
     );
-  };
-
-  const shareToWhatsApp = async (post: Post) => {
-    const text = `📱 Confira esta postagem do RETESP 4L!\n\n${post.content}\n\n🏆 RETESP 4L - Gestão Esportiva`;
-    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-    Linking.openURL(url);
-    setShareModalVisible(false);
-  };
-
-  const shareToInstagram = async (post: Post) => {
-    const text = `📱 Confira esta postagem do RETESP 4L!\n\n${post.content}`;
-    const url = `instagram://share?text=${encodeURIComponent(text)}`;
-    Linking.openURL(url).catch(() => {
-      Alert.alert('Instagram não instalado', 'Por favor, instale o Instagram');
-    });
-    setShareModalVisible(false);
-  };
-
-  const shareToFacebook = async (post: Post) => {
-    const text = `📱 Confira esta postagem do RETESP 4L!\n\n${post.content}`;
-    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('http://localhost:3001/social')}&quote=${encodeURIComponent(text)}`;
-    Linking.openURL(url);
-    setShareModalVisible(false);
-  };
-
-  const shareViaLink = async (post: Post) => {
-    const link = `http://localhost:3001/social?post=${post.id}`;
-    Alert.alert('🔗 Link', link, [
-      { 
-        text: 'Copiar', 
-        onPress: () => Alert.alert('Copiado!', 'Link copiado para a área de transferência') 
-      },
-      { text: 'OK' },
-    ]);
-    setShareModalVisible(false);
   };
 
   const openStory = (story: Story) => {
@@ -999,7 +1231,7 @@ export default function SocialScreen() {
       return (
         <View style={[styles.videoPlayer, styles.videoFallback]}>
           <Icon name="play-circle" size={40} color={colors.primary} />
-          <Text style={styles.videoFallbackText}>Vídeo não disponível</Text>
+          <Text style={styles.videoFallbackText}>▶️ Vídeo não disponível</Text>
         </View>
       );
     }
@@ -1159,7 +1391,7 @@ export default function SocialScreen() {
                 ) : (
                   <View style={styles.storyModalEmpty}>
                     <Icon name="images" size={50} color={colors.textSecondary} />
-                    <Text style={styles.storyModalEmptyText}>Sem mídia</Text>
+                    <Text style={styles.storyModalEmptyText}>🖼️ Sem mídia</Text>
                   </View>
                 )}
               </View>
@@ -1180,6 +1412,90 @@ export default function SocialScreen() {
     );
   };
 
+  // ==================== MODAL DE COMENTÁRIOS - CUSTOM SEM MODAL DO RN ====================
+  const CommentModal = () => {
+    if (!commentModalVisible) return null;
+
+    return (
+      <TouchableWithoutFeedback onPress={() => {
+        Keyboard.dismiss();
+      }}>
+        <View style={styles.commentOverlay}>
+          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+            <View style={styles.commentModalContent}>
+              <Text style={styles.commentModalTitle}>💬 Comentários</Text>
+              
+              <ScrollView style={styles.commentList} keyboardShouldPersistTaps="handled">
+                {comments.length === 0 ? (
+                  <View style={{ padding: 20, alignItems: 'center' }}>
+                    <Text style={{ color: colors.textSecondary }}>📭 Nenhum comentário ainda</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+                      Seja o primeiro a comentar!
+                    </Text>
+                  </View>
+                ) : (
+                  comments.map((item) => (
+                    <View key={item.id} style={styles.commentItem}>
+                      <View style={styles.commentAvatar}>
+                        <Text style={styles.commentAvatarText}>
+                          {item.author.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.commentContent}>
+                        <Text style={styles.commentAuthor}>{item.author}</Text>
+                        <Text style={styles.commentTextStyle}>{item.text}</Text>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+
+              <View style={styles.commentInputContainer}>
+                <TextInput
+                  ref={commentInputRef}
+                  style={styles.commentInput}
+                  placeholder="Escreva um comentário..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={commentText}
+                  onChangeText={(text) => setCommentText(text)}
+                  returnKeyType="send"
+                  onSubmitEditing={sendComment}
+                  blurOnSubmit={false}
+                  autoFocus={false}
+                />
+                <TouchableOpacity
+                  style={styles.commentSendButton}
+                  onPress={sendComment}
+                  disabled={sendingComment}
+                >
+                  {sendingComment ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Text style={{ fontSize: 16 }}>📤</Text>
+                      <Text style={styles.commentSendText}>Enviar</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.commentCloseButton}
+                onPress={() => {
+                  setCommentModalVisible(false);
+                  Keyboard.dismiss();
+                }}
+              >
+                <Text style={{ fontSize: 16 }}>❌</Text>
+                <Text style={styles.commentCloseText}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    );
+  };
+
   const ShareModal = () => (
     <Modal
       visible={shareModalVisible}
@@ -1197,52 +1513,40 @@ export default function SocialScreen() {
                 style={styles.shareOption}
                 onPress={() => shareToStatus(selectedPost)}
               >
-                <View style={[styles.shareIcon, { backgroundColor: '#8B5CF620' }]}>
-                  <View style={styles.statusIcon}>
-                    <View style={styles.statusGradient} />
-                  </View>
-                </View>
-                <Text style={styles.shareLabel}>Status</Text>
+                <Text style={styles.shareIconEmoji}>📱</Text>
+                <Text style={styles.shareOptionText}>Status</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.shareOption}
                 onPress={() => shareToWhatsApp(selectedPost)}
               >
-                <View style={[styles.shareIcon, { backgroundColor: '#25D36620' }]}>
-                  <Icon name="logo-whatsapp" size={32} color="#25D366" />
-                </View>
-                <Text style={styles.shareLabel}>WhatsApp</Text>
+                <Text style={styles.shareIconEmoji}>💬</Text>
+                <Text style={styles.shareOptionText}>WhatsApp</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.shareOption}
                 onPress={() => shareToInstagram(selectedPost)}
               >
-                <View style={[styles.shareIcon, { backgroundColor: '#E1306C20' }]}>
-                  <Icon name="logo-instagram" size={32} color="#E1306C" />
-                </View>
-                <Text style={styles.shareLabel}>Instagram</Text>
+                <Text style={styles.shareIconEmoji}>📸</Text>
+                <Text style={styles.shareOptionText}>Instagram</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.shareOption}
                 onPress={() => shareToFacebook(selectedPost)}
               >
-                <View style={[styles.shareIcon, { backgroundColor: '#1877F220' }]}>
-                  <Icon name="logo-facebook" size={32} color="#1877F2" />
-                </View>
-                <Text style={styles.shareLabel}>Facebook</Text>
+                <Text style={styles.shareIconEmoji}>📘</Text>
+                <Text style={styles.shareOptionText}>Facebook</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.shareOption}
                 onPress={() => shareViaLink(selectedPost)}
               >
-                <View style={[styles.shareIcon, { backgroundColor: colors.primary + '20' }]}>
-                  <Icon name="link" size={32} color={colors.primary} />
-                </View>
-                <Text style={styles.shareLabel}>Copiar Link</Text>
+                <Text style={styles.shareIconEmoji}>🔗</Text>
+                <Text style={styles.shareOptionText}>Copiar Link</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1251,7 +1555,7 @@ export default function SocialScreen() {
             style={styles.shareCancelButton}
             onPress={() => setShareModalVisible(false)}
           >
-            <Text style={styles.shareCancelText}>Cancelar</Text>
+            <Text style={styles.shareCancelText}>❌ Cancelar</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1262,7 +1566,7 @@ export default function SocialScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Carregando...</Text>
+        <Text style={styles.loadingText}>⏳ Carregando...</Text>
       </View>
     );
   }
@@ -1287,7 +1591,9 @@ export default function SocialScreen() {
             onPress={() => filterByTeam(null)}
             style={[styles.filterButton, !selectedTeam && styles.filterButtonActive]}
           >
-            <Text style={[styles.filterText, !selectedTeam && styles.filterTextActive]}>Todas</Text>
+            <Text style={[styles.filterText, !selectedTeam && styles.filterTextActive]}>
+              📋 Todas
+            </Text>
           </TouchableOpacity>
           {teams.map(team => (
             <TouchableOpacity
@@ -1305,7 +1611,7 @@ export default function SocialScreen() {
         <View style={styles.createPost}>
           <View style={styles.createPostHeader}>
             <View style={styles.createPostAvatar}>
-              <Text style={styles.createPostAvatarText}>📝</Text>
+              <Icon name="create" size={20} color="#FFFFFF" />
             </View>
             <TextInput
               style={styles.postInput}
@@ -1347,16 +1653,29 @@ export default function SocialScreen() {
           )}
 
           <View style={styles.postActions}>
-            <View style={styles.mediaButtons}>
-              <TouchableOpacity onPress={handleImagePicker} disabled={uploading}>
-                <Icon name="image" size={24} color={colors.primary} />
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity
+                style={[styles.mediaButton, styles.mediaButtonImage]}
+                onPress={handleImagePicker}
+                disabled={uploading}
+              >
+                <Text style={{ fontSize: 16 }}>📸</Text>
+                <Text style={[styles.mediaButtonText, styles.mediaButtonTextImage]}>
+                  {selectedImage ? 'Foto ✓' : 'Foto'}
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleVideoPicker} disabled={uploading}>
-                <Icon name="videocam" size={24} color="#8B5CF6" />
-              </TouchableOpacity>
-            </View>
 
-            <View style={styles.postRightActions}>
+              <TouchableOpacity
+                style={[styles.mediaButton, styles.mediaButtonVideo]}
+                onPress={handleVideoPicker}
+                disabled={uploading}
+              >
+                <Text style={{ fontSize: 16 }}>🎬</Text>
+                <Text style={[styles.mediaButtonText, styles.mediaButtonTextVideo]}>
+                  {selectedVideo ? 'Vídeo ✓' : 'Vídeo'}
+                </Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.postButton}
                 onPress={createPost}
@@ -1365,7 +1684,10 @@ export default function SocialScreen() {
                 {creating || uploading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.postButtonText}>Publicar</Text>
+                  <>
+                    <Text style={{ fontSize: 16, color: '#FFFFFF' }}>📤</Text>
+                    <Text style={styles.postButtonText}>Publicar</Text>
+                  </>
                 )}
               </TouchableOpacity>
             </View>
@@ -1406,25 +1728,37 @@ export default function SocialScreen() {
             )}
 
             <View style={styles.postFooter}>
+              {/* Curtir */}
               <TouchableOpacity
-                style={styles.postAction}
+                style={[styles.postAction, { backgroundColor: '#EF444420' }]}
                 onPress={() => toggleLike(post.id)}
               >
-                <Icon name="heart" size={20} color="#EF4444" />
-                <Text style={styles.postActionText}>{likes[post.id] || 0}</Text>
+                <Text style={{ fontSize: 16 }}>❤️</Text>
+                <Text style={[styles.postActionText, { color: '#EF4444' }]}>
+                  {likes[post.id] || 0}
+                </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.postAction}>
-                <Icon name="chatbubble" size={20} color={colors.textSecondary} />
-                <Text style={styles.postActionText}>{post.comments}</Text>
-              </TouchableOpacity>
-
+              {/* Comentar */}
               <TouchableOpacity
-                style={styles.postAction}
+                style={[styles.postAction, { backgroundColor: '#3B82F620' }]}
+                onPress={() => openCommentModal(post)}
+              >
+                <Text style={{ fontSize: 16 }}>💬</Text>
+                <Text style={[styles.postActionText, { color: '#3B82F6' }]}>
+                  {post.comments || 0}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Compartilhar */}
+              <TouchableOpacity
+                style={[styles.postAction, { backgroundColor: '#8B5CF620' }]}
                 onPress={() => handleShare(post)}
               >
-                <Icon name="share-social" size={20} color={colors.primary} />
-                <Text style={styles.postActionText}>Compartilhar</Text>
+                <Text style={{ fontSize: 16 }}>📤</Text>
+                <Text style={[styles.postActionText, { color: '#8B5CF6' }]}>
+                  Compartilhar
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1435,6 +1769,7 @@ export default function SocialScreen() {
 
       <StoryModal />
       <ShareModal />
+      <CommentModal />
     </View>
   );
 }

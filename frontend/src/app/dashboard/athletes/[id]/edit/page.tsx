@@ -1,3 +1,4 @@
+// frontend/src/app/dashboard/athletes/[id]/edit/pages.tsx
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";

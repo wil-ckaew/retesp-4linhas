@@ -1,3 +1,4 @@
+//mobile/src/screens/VideosScreen.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -12,6 +13,7 @@ import {
   Modal,
   TextInput,
   Linking,
+  Image,
   Platform,
 } from 'react-native';
 import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
@@ -29,6 +31,7 @@ interface VideoItem {
   uploaded_at: string;
   athlete_name: string;
   athlete_id?: string;
+  avatar_url?: string | null;
   title?: string;
   description?: string;
 }
@@ -47,6 +50,7 @@ const VideoItemComponent = ({
   onShare,
   onEdit,
   onDelete,
+  onSaveVideo,
   colors,
 }: { 
   item: VideoItem; 
@@ -61,11 +65,14 @@ const VideoItemComponent = ({
   onShare: (item: VideoItem) => void;
   onEdit: (item: VideoItem) => void;
   onDelete: (id: string) => void;
+  onSaveVideo: (item: VideoItem) => Promise<void>;
   colors: any;
 }) => {
   const videoUrl = `${API_URL}${item.file_url}`;
   const [playerError, setPlayerError] = useState(false);
-  
+  const [avatarError, setAvatarError] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const player = useVideoPlayer(videoUrl, (player) => {
     player.loop = true;
     if (isActive) {
@@ -73,6 +80,18 @@ const VideoItemComponent = ({
     }
     onPlayerReady(player, item.id);
   });
+
+  // Monitorar erros do player
+  useEffect(() => {
+    const subscription = player.addListener('statusChange', (status: any) => {
+      if (status.status === 'error') {
+        setPlayerError(true);
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [player]);
 
   useEffect(() => {
     if (isActive) {
@@ -86,6 +105,45 @@ const VideoItemComponent = ({
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
     return num.toString();
+  };
+
+  // Função para obter URL do avatar
+  const getAvatarUrl = (avatar_url: string | null | undefined): string | null => {
+    if (!avatar_url) return null;
+    if (avatar_url.startsWith('http://') || avatar_url.startsWith('https://')) {
+      return avatar_url;
+    }
+    if (avatar_url.startsWith('/uploads/')) {
+      let url = avatar_url;
+      if (url.endsWith('.bin')) {
+        url = url.replace('.bin', '.jpg');
+      }
+      if (!url.includes('.')) {
+        url = url + '.jpg';
+      }
+      return `${API_URL}${url}`;
+    }
+    if (avatar_url.startsWith('/')) {
+      return `${API_URL}${avatar_url}`;
+    }
+    return `${API_URL}/uploads/${avatar_url}`;
+  };
+
+  const avatarUrl = getAvatarUrl(item.avatar_url);
+  const showInitials = !avatarUrl || avatarError;
+
+  // Função para salvar vídeo
+  const handleSaveVideo = async () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await onSaveVideo(item);
+    } catch (error) {
+      console.error('Erro ao salvar vídeo:', error);
+      Alert.alert('Erro', 'Não foi possível salvar o vídeo');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const styles = StyleSheet.create({
@@ -107,11 +165,20 @@ const VideoItemComponent = ({
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: '#000000',
+      padding: 20,
     },
     errorText: {
       color: colors.textSecondary,
       fontSize: 16,
       marginTop: 8,
+    },
+    overlayGradient: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 300,
+      backgroundColor: 'rgba(0,0,0,0.6)',
     },
     overlay: {
       position: 'absolute',
@@ -120,22 +187,59 @@ const VideoItemComponent = ({
       right: 0,
       flexDirection: 'row',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingBottom: 20,
-      paddingTop: 40,
-      backgroundColor: 'rgba(0,0,0,0.4)',
-      minHeight: 200,
+      paddingHorizontal: 20,
+      paddingBottom: 30,
+      paddingTop: 60,
     },
     infoContainer: {
       flex: 1,
       justifyContent: 'flex-end',
       paddingRight: 16,
     },
+    athleteContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    athleteAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
+      overflow: 'hidden',
+      marginRight: 10,
+    },
+    athleteAvatarImage: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      resizeMode: 'cover',
+    },
+    athleteAvatarText: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
     athleteName: {
       color: '#FFFFFF',
       fontSize: 20,
       fontWeight: 'bold',
-      marginBottom: 4,
+    },
+    athleteBadge: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 10,
+      marginLeft: 8,
+    },
+    athleteBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '600',
     },
     videoTitle: {
       color: '#D1D5DB',
@@ -161,6 +265,18 @@ const VideoItemComponent = ({
       alignItems: 'center',
       marginBottom: 12,
     },
+    actionEmojiContainer: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(255,255,255,0.12)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 2,
+    },
+    actionEmoji: {
+      fontSize: 20,
+    },
     actionText: {
       color: '#FFFFFF',
       fontSize: 11,
@@ -173,22 +289,87 @@ const VideoItemComponent = ({
       textAlign: 'center',
       marginTop: 2,
     },
-    avatarCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+    retryButton: {
+      marginTop: 16,
       backgroundColor: colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    retryButtonText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    shareModalContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      justifyContent: 'flex-end',
+      padding: 20,
+    },
+    shareModalContent: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 24,
+      width: '100%',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    shareModalTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    shareOptionsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-around',
+      marginBottom: 20,
+    },
+    shareOption: {
+      alignItems: 'center',
+      padding: 12,
+      borderRadius: 16,
+      backgroundColor: colors.hover,
+      width: 70,
+      marginBottom: 12,
+    },
+    shareOptionIcon: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
       justifyContent: 'center',
       alignItems: 'center',
-      borderWidth: 2,
-      borderColor: '#FFFFFF',
+      marginBottom: 4,
     },
-    avatarText: {
-      color: '#FFFFFF',
-      fontSize: 18,
-      fontWeight: 'bold',
+    shareOptionText: {
+      color: colors.text,
+      fontSize: 11,
+      textAlign: 'center',
+      marginTop: 2,
+    },
+    shareCancelButton: {
+      backgroundColor: colors.hover,
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    shareCancelText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
     },
   });
+
+  // Função para abrir o modal de compartilhamento
+  const openShareModal = () => {
+    onShare(item);
+  };
 
   if (playerError) {
     return (
@@ -196,6 +377,13 @@ const VideoItemComponent = ({
         <View style={styles.errorContainer}>
           <Icon name="alert-circle-outline" size={50} color="#EF4444" />
           <Text style={styles.errorText}>Erro ao carregar vídeo</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => setPlayerError(false)}
+          >
+            <Icon name="refresh" size={20} color="#FFFFFF" />
+            <Text style={styles.retryButtonText}>Tentar novamente</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -208,24 +396,45 @@ const VideoItemComponent = ({
         player={player}
         contentFit="cover"
         nativeControls={false}
-        onError={() => setPlayerError(true)}
       />
+
+      {/* Gradiente de fundo do overlay */}
+      <View style={styles.overlayGradient} />
 
       {/* Overlay com informações e ações */}
       <View style={styles.overlay}>
         {/* Informações do vídeo - lado esquerdo */}
         <View style={styles.infoContainer}>
-          <Text style={styles.athleteName}>{item.athlete_name || 'Atleta'}</Text>
+          <View style={styles.athleteContainer}>
+            <View style={styles.athleteAvatar}>
+              {showInitials ? (
+                <Text style={styles.athleteAvatarText}>
+                  {item.athlete_name?.charAt(0)?.toUpperCase() || '?'}
+                </Text>
+              ) : (
+                <Image
+                  source={{ uri: avatarUrl || undefined }}
+                  style={styles.athleteAvatarImage}
+                  onError={() => setAvatarError(true)}
+                />
+              )}
+            </View>
+            <Text style={styles.athleteName}>{item.athlete_name || 'Atleta'}</Text>
+            <View style={styles.athleteBadge}>
+              <Text style={styles.athleteBadgeText}>PRO</Text>
+            </View>
+          </View>
+
           {item.title && (
-            <Text style={styles.videoTitle}>{item.title}</Text>
+            <Text style={styles.videoTitle}>🎬 {item.title}</Text>
           )}
           <Text style={styles.videoDescription}>
-            {item.description || `🎬 Vídeo de treino`}
+            {item.description || '🎬 Vídeo de treino'}
           </Text>
           <Text style={styles.videoDate}>
-            {new Date(item.uploaded_at).toLocaleDateString('pt-BR', {
+            📅 {new Date(item.uploaded_at).toLocaleDateString('pt-BR', {
               day: '2-digit',
-              month: '2-digit',
+              month: 'long',
               year: 'numeric',
             })}
           </Text>
@@ -235,10 +444,8 @@ const VideoItemComponent = ({
         <View style={styles.actionsContainer}>
           {/* Perfil */}
           <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>
-                {item.athlete_name?.charAt(0)?.toUpperCase() || '?'}
-              </Text>
+            <View style={styles.actionEmojiContainer}>
+              <Text style={styles.actionEmoji}>👤</Text>
             </View>
             <Text style={styles.actionLabel}>Perfil</Text>
           </TouchableOpacity>
@@ -246,78 +453,81 @@ const VideoItemComponent = ({
           {/* Curtir */}
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => {
-              console.log('❤️ Curtir clicado:', item.id);
-              onToggleLike(item.id);
-            }}
+            onPress={() => onToggleLike(item.id)}
             activeOpacity={0.7}
           >
-            <Icon 
-              name={isLiked[item.id] ? 'heart' : 'heart-outline'} 
-              size={32} 
-              color={isLiked[item.id] ? '#EF4444' : '#FFFFFF'} 
-            />
-            <Text style={styles.actionText}>
-              {formatNumber(likeCounts[item.id] || 0)}
-            </Text>
+            <View style={[
+              styles.actionEmojiContainer,
+              isLiked[item.id] && { backgroundColor: 'rgba(239, 68, 68, 0.3)' }
+            ]}>
+              <Text style={styles.actionEmoji}>
+                {isLiked[item.id] ? '❤️' : '🤍'}
+              </Text>
+            </View>
+            <Text style={styles.actionText}>{formatNumber(likeCounts[item.id] || 0)}</Text>
           </TouchableOpacity>
 
           {/* Visualizações */}
           <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-            <Icon name="eye-outline" size={28} color="#FFFFFF" />
-            <Text style={styles.actionText}>
-              {formatNumber(viewCounts[item.id] || 0)}
-            </Text>
+            <View style={styles.actionEmojiContainer}>
+              <Text style={styles.actionEmoji}>👁️</Text>
+            </View>
+            <Text style={styles.actionText}>{formatNumber(viewCounts[item.id] || 0)}</Text>
           </TouchableOpacity>
 
-          {/* Salvar */}
+          {/* Salvar com download */}
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => {
-              console.log('💾 Salvar clicado:', item.id);
-              onToggleSave(item.id);
-            }}
+            onPress={handleSaveVideo}
             activeOpacity={0.7}
+            disabled={isDownloading}
           >
-            <Icon 
-              name={isSaved[item.id] ? 'bookmark' : 'bookmark-outline'} 
-              size={28} 
-              color={isSaved[item.id] ? colors.primary : '#FFFFFF'} 
-            />
-            <Text style={styles.actionText}>Salvar</Text>
+            <View style={[
+              styles.actionEmojiContainer,
+              isSaved[item.id] && { backgroundColor: 'rgba(59, 130, 246, 0.3)' }
+            ]}>
+              <Text style={styles.actionEmoji}>
+                {isDownloading ? '⏳' : (isSaved[item.id] ? '💾' : '💿')}
+              </Text>
+            </View>
+            <Text style={styles.actionText}>
+              {isDownloading ? 'Baixando...' : (isSaved[item.id] ? 'Salvo' : 'Salvar')}
+            </Text>
           </TouchableOpacity>
 
           {/* Compartilhar */}
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => {
-              console.log('📤 Compartilhar clicado:', item.id);
-              onShare(item);
-            }}
+            onPress={openShareModal}
             activeOpacity={0.7}
           >
-            <Icon name="share-social-outline" size={28} color="#FFFFFF" />
+            <View style={styles.actionEmojiContainer}>
+              <Text style={styles.actionEmoji}>📤</Text>
+            </View>
             <Text style={styles.actionLabel}>Compartilhar</Text>
           </TouchableOpacity>
 
-          {/* Mais (Editar/Excluir) */}
+          {/* Mais (Configurações) */}
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => {
               Alert.alert(
-                'Ações do vídeo',
+                '⚙️ Configurações do vídeo',
                 'O que deseja fazer?',
                 [
-                  { text: '✎ Editar', onPress: () => onEdit(item) },
-                  { text: '🗑️ Excluir', onPress: () => onDelete(item.id), style: 'destructive' },
-                  { text: 'Cancelar', style: 'cancel' },
+                  { text: '✎ Editar informações', onPress: () => onEdit(item) },
+                  { text: '📥 Baixar vídeo', onPress: handleSaveVideo },
+                  { text: '🗑️ Excluir vídeo', onPress: () => onDelete(item.id), style: 'destructive' },
+                  { text: '❌ Cancelar', style: 'cancel' },
                 ]
               );
             }}
             activeOpacity={0.7}
           >
-            <Icon name="ellipsis-horizontal" size={28} color="#FFFFFF" />
-            <Text style={styles.actionLabel}>Mais</Text>
+            <View style={styles.actionEmojiContainer}>
+              <Text style={styles.actionEmoji}>⚙️</Text>
+            </View>
+            <Text style={styles.actionLabel}>Configurações</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -331,6 +541,7 @@ export default function VideosScreen() {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -377,12 +588,12 @@ export default function VideosScreen() {
     },
     positionIndicator: {
       position: 'absolute',
-      top: 50,
+      top: 60,
       right: 16,
       backgroundColor: 'rgba(0,0,0,0.6)',
       paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderRadius: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
     },
     positionText: {
       color: '#FFFFFF',
@@ -434,7 +645,6 @@ export default function VideosScreen() {
     },
     modalButtons: {
       flexDirection: 'row',
-      gap: 12,
       marginTop: 8,
     },
     modalButton: {
@@ -442,6 +652,9 @@ export default function VideosScreen() {
       paddingVertical: 12,
       borderRadius: 8,
       alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginHorizontal: 6,
     },
     modalCancelButton: {
       backgroundColor: colors.hover,
@@ -453,6 +666,66 @@ export default function VideosScreen() {
       color: '#FFFFFF',
       fontWeight: '600',
       fontSize: 15,
+    },
+    shareModalContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      justifyContent: 'flex-end',
+      padding: 20,
+    },
+    shareModalContent: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 24,
+      width: '100%',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    shareModalTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    shareOptionsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-around',
+      marginBottom: 20,
+    },
+    shareOption: {
+      alignItems: 'center',
+      padding: 12,
+      borderRadius: 16,
+      backgroundColor: colors.hover,
+      width: 70,
+      marginBottom: 12,
+    },
+    shareOptionIcon: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    shareOptionText: {
+      color: colors.text,
+      fontSize: 11,
+      textAlign: 'center',
+      marginTop: 2,
+    },
+    shareCancelButton: {
+      backgroundColor: colors.hover,
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    shareCancelText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
     },
   });
 
@@ -485,6 +758,74 @@ export default function VideosScreen() {
     playersRef.current[id] = player;
   }, []);
 
+  // ========== FUNÇÃO PARA SALVAR/BAIXAR VÍDEO ==========
+  const saveVideoToDevice = async (video: VideoItem) => {
+    console.log('🔴 saveVideoToDevice chamado para:', video.id);
+    
+    try {
+      // Verificar se o vídeo já foi salvo
+      if (isSaved[video.id]) {
+        Alert.alert('ℹ️ Informação', 'Este vídeo já foi baixado!');
+        return;
+      }
+
+      const url = `${API_URL}${video.file_url}`;
+      console.log('📥 URL do vídeo:', url);
+
+      // Para web
+      if (Platform.OS === 'web') {
+        Alert.alert(
+          '📥 Baixar vídeo',
+          'Clique em OK para abrir o link do vídeo',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { 
+              text: 'OK', 
+              onPress: () => {
+                window.open(url, '_blank');
+                setIsSaved(prev => ({ ...prev, [video.id]: true }));
+                Alert.alert('✅ Sucesso', 'Vídeo aberto em nova aba!');
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      // Para mobile - usar Sharing
+      if (await Sharing.isAvailableAsync()) {
+        Alert.alert(
+          '📥 Baixar vídeo',
+          'O vídeo será compartilhado para você salvar',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { 
+              text: 'OK', 
+              onPress: async () => {
+                try {
+                  await Sharing.shareAsync(url, {
+                    mimeType: 'video/mp4',
+                    dialogTitle: 'Salvar vídeo',
+                  });
+                  setIsSaved(prev => ({ ...prev, [video.id]: true }));
+                  Alert.alert('✅ Sucesso', 'Vídeo compartilhado com sucesso!');
+                } catch (error) {
+                  console.error('Erro ao compartilhar:', error);
+                  Alert.alert('❌ Erro', 'Não foi possível compartilhar o vídeo');
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('❌ Erro', 'Compartilhamento não disponível');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao baixar vídeo:', error);
+      Alert.alert('❌ Erro', 'Não foi possível baixar o vídeo');
+    }
+  };
+
   // ========== FUNÇÕES DE COMPARTILHAMENTO ==========
 
   const shareToWhatsApp = async (video: VideoItem) => {
@@ -492,7 +833,12 @@ export default function VideosScreen() {
       const url = `${API_URL}${video.file_url}`;
       const text = `🎥 Confira este vídeo do RETESP 4L!\n\n🏆 ${video.athlete_name || 'Atleta'}\n\n🔗 ${url}`;
       const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-      await Linking.openURL(whatsappUrl);
+      const supported = await Linking.canOpenURL(whatsappUrl);
+      if (supported) {
+        await Linking.openURL(whatsappUrl);
+      } else {
+        Alert.alert('WhatsApp não instalado', 'Por favor, instale o WhatsApp');
+      }
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível abrir o WhatsApp');
     }
@@ -513,6 +859,21 @@ export default function VideosScreen() {
     }
   };
 
+  const shareToTikTok = async (video: VideoItem) => {
+    try {
+      const url = `${API_URL}${video.file_url}`;
+      const tiktokUrl = `https://www.tiktok.com/@relesportes/video/${video.id}`;
+      const supported = await Linking.canOpenURL(tiktokUrl);
+      if (supported) {
+        await Linking.openURL(tiktokUrl);
+      } else {
+        Alert.alert('TikTok não instalado', 'Por favor, instale o TikTok');
+      }
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível abrir o TikTok');
+    }
+  };
+
   const shareToFacebook = async (video: VideoItem) => {
     try {
       const url = encodeURIComponent(`${API_URL}${video.file_url}`);
@@ -521,6 +882,17 @@ export default function VideosScreen() {
       await Linking.openURL(facebookUrl);
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível abrir o Facebook');
+    }
+  };
+
+  const shareToTwitter = async (video: VideoItem) => {
+    try {
+      const url = encodeURIComponent(`${API_URL}${video.file_url}`);
+      const text = encodeURIComponent(`🎥 Confira este vídeo do RETESP 4L!\n\n🏆 ${video.athlete_name || 'Atleta'}`);
+      const twitterUrl = `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
+      await Linking.openURL(twitterUrl);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível abrir o Twitter');
     }
   };
 
@@ -535,7 +907,7 @@ export default function VideosScreen() {
           dialogTitle: 'Compartilhar vídeo',
         });
       } else {
-        Alert.alert('🔗 Link do vídeo', message, [
+        Alert.alert('Link do vídeo', message, [
           { text: 'Copiar', onPress: () => Alert.alert('Copiado!', 'Link copiado') },
           { text: 'OK' },
         ]);
@@ -545,19 +917,38 @@ export default function VideosScreen() {
     }
   };
 
-  const showShareOptions = (video: VideoItem) => {
-    Alert.alert(
-      '📤 Compartilhar vídeo',
-      'Escolha como deseja compartilhar:',
-      [
-        { text: '📱 WhatsApp', onPress: () => shareToWhatsApp(video) },
-        { text: '📸 Instagram', onPress: () => shareToInstagram(video) },
-        { text: '📘 Facebook', onPress: () => shareToFacebook(video) },
-        { text: '🔗 Link', onPress: () => shareLink(video) },
-        { text: 'Cancelar', style: 'cancel' },
-      ],
-      { cancelable: true }
-    );
+  const openShareModal = (video: VideoItem) => {
+    setSelectedVideo(video);
+    setShowShareModal(true);
+  };
+
+  const handleShareOption = (option: string) => {
+    if (!selectedVideo) return;
+    
+    setShowShareModal(false);
+    
+    switch (option) {
+      case 'whatsapp':
+        shareToWhatsApp(selectedVideo);
+        break;
+      case 'instagram':
+        shareToInstagram(selectedVideo);
+        break;
+      case 'tiktok':
+        shareToTikTok(selectedVideo);
+        break;
+      case 'facebook':
+        shareToFacebook(selectedVideo);
+        break;
+      case 'twitter':
+        shareToTwitter(selectedVideo);
+        break;
+      case 'link':
+        shareLink(selectedVideo);
+        break;
+      default:
+        break;
+    }
   };
 
   // ========== FUNÇÕES DE INTERAÇÃO ==========
@@ -569,15 +960,6 @@ export default function VideosScreen() {
       ...likeCounts,
       [videoId]: (likeCounts[videoId] || 0) + (currentLike ? -1 : 1),
     });
-  };
-
-  const toggleSave = (videoId: string) => {
-    const currentSave = isSaved[videoId] || false;
-    setIsSaved({ ...isSaved, [videoId]: !currentSave });
-    Alert.alert(
-      currentSave ? 'Removido' : 'Salvo!',
-      currentSave ? 'Vídeo removido dos salvos' : 'Vídeo salvo com sucesso!'
-    );
   };
 
   const deleteVideo = async (videoId: string) => {
@@ -669,11 +1051,12 @@ export default function VideosScreen() {
         isLiked={isLiked}
         onToggleLike={toggleLike}
         isSaved={isSaved}
-        onToggleSave={toggleSave}
+        onToggleSave={() => {}}
         viewCounts={viewCounts}
-        onShare={showShareOptions}
+        onShare={openShareModal}
         onEdit={openEditModal}
         onDelete={deleteVideo}
+        onSaveVideo={saveVideoToDevice}
         colors={colors}
       />
     );
@@ -727,6 +1110,7 @@ export default function VideosScreen() {
         </Text>
       </View>
 
+      {/* Modal de Edição */}
       <Modal
         visible={showEditModal}
         transparent={true}
@@ -735,7 +1119,7 @@ export default function VideosScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>✎ Editar Vídeo</Text>
+            <Text style={styles.modalTitle}>Editar Vídeo</Text>
             
             <View style={styles.modalField}>
               <Text style={styles.modalLabel}>Título</Text>
@@ -766,17 +1150,112 @@ export default function VideosScreen() {
                 style={[styles.modalButton, styles.modalCancelButton]}
                 onPress={() => setShowEditModal(false)}
               >
+                <Text style={{ fontSize: 16 }}>❌</Text>
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalSaveButton]}
                 onPress={() => selectedVideo && editVideo(selectedVideo.id)}
               >
+                <Text style={{ fontSize: 16 }}>💾</Text>
                 <Text style={styles.modalButtonText}>Salvar</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Modal de Compartilhamento */}
+      <Modal
+        visible={showShareModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowShareModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.shareModalContainer}
+          activeOpacity={1}
+          onPress={() => setShowShareModal(false)}
+        >
+          <View style={styles.shareModalContent}>
+            <Text style={styles.shareModalTitle}>📤 Compartilhar vídeo</Text>
+            
+            <View style={styles.shareOptionsGrid}>
+              {/* WhatsApp */}
+              <TouchableOpacity 
+                style={styles.shareOption}
+                onPress={() => handleShareOption('whatsapp')}
+              >
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#25D366' }]}>
+                  <Text style={{ fontSize: 30 }}>📱</Text>
+                </View>
+                <Text style={styles.shareOptionText}>WhatsApp</Text>
+              </TouchableOpacity>
+
+              {/* Instagram */}
+              <TouchableOpacity 
+                style={styles.shareOption}
+                onPress={() => handleShareOption('instagram')}
+              >
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#E4405F' }]}>
+                  <Text style={{ fontSize: 30 }}>📸</Text>
+                </View>
+                <Text style={styles.shareOptionText}>Instagram</Text>
+              </TouchableOpacity>
+
+              {/* TikTok */}
+              <TouchableOpacity 
+                style={styles.shareOption}
+                onPress={() => handleShareOption('tiktok')}
+              >
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#000000' }]}>
+                  <Text style={{ fontSize: 30 }}>🎵</Text>
+                </View>
+                <Text style={styles.shareOptionText}>TikTok</Text>
+              </TouchableOpacity>
+
+              {/* Facebook */}
+              <TouchableOpacity 
+                style={styles.shareOption}
+                onPress={() => handleShareOption('facebook')}
+              >
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#1877F2' }]}>
+                  <Text style={{ fontSize: 30 }}>📘</Text>
+                </View>
+                <Text style={styles.shareOptionText}>Facebook</Text>
+              </TouchableOpacity>
+
+              {/* Twitter */}
+              <TouchableOpacity 
+                style={styles.shareOption}
+                onPress={() => handleShareOption('twitter')}
+              >
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#1DA1F2' }]}>
+                  <Text style={{ fontSize: 30 }}>🐦</Text>
+                </View>
+                <Text style={styles.shareOptionText}>Twitter</Text>
+              </TouchableOpacity>
+
+              {/* Link */}
+              <TouchableOpacity 
+                style={styles.shareOption}
+                onPress={() => handleShareOption('link')}
+              >
+                <View style={[styles.shareOptionIcon, { backgroundColor: colors.primary }]}>
+                  <Text style={{ fontSize: 30 }}>🔗</Text>
+                </View>
+                <Text style={styles.shareOptionText}>Copiar Link</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.shareCancelButton}
+              onPress={() => setShowShareModal(false)}
+            >
+              <Text style={styles.shareCancelText}>❌ Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

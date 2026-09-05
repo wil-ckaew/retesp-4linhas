@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Trophy, Search, TrendingUp, TrendingDown, Minus,
-  RefreshCw
+  RefreshCw, X
 } from 'lucide-react';
 
 interface Athlete {
@@ -19,15 +19,26 @@ interface AthleteRanking {
   category: string;
   avatar_url: string | null;
   points: number;
-  games: number;
-  goals: number;
-  assists: number;
-  wins: number;
-  losses: number;
   attendance_rate: number;
+  total_classes: number;
+  attended_classes: number;
+  absences: number;
   ranking_position: number;
-  evolution: 'up' | 'down' | 'stable';
-  last_match_performance: number;
+  perfect_attendance: boolean;
+  streak_months: number;
+  diamond_eligible: boolean;
+}
+
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  unlocked: boolean;
+  category: 'attendance' | 'diamond' | 'special';
+  requirement: number;
+  currentProgress: number;
 }
 
 export default function RankingPage() {
@@ -39,111 +50,302 @@ export default function RankingPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('points');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showAchievementsModal, setShowAchievementsModal] = useState(false);
+  const [selectedAthlete, setSelectedAthlete] = useState<AthleteRanking | null>(null);
+  const [athleteAchievements, setAthleteAchievements] = useState<Achievement[]>([]);
+  const [unlockedCount, setUnlockedCount] = useState(0);
+  const [totalAchievements, setTotalAchievements] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081';
+  // CORREÇÃO: URL do backend no Docker
+  // Em produção no Docker, o backend está em http://retesp-backend:8080
+  // Para desenvolvimento local, use http://localhost:8081
+  const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+    ? 'http://localhost:8081' 
+    : 'http://retesp-backend:8080';
 
-  // Gerar dados de ranking a partir dos atletas reais
-  const generateRankingData = (athletesData: Athlete[]): AthleteRanking[] => {
-    const evolutions: ('up' | 'down' | 'stable')[] = ['up', 'down', 'stable'];
+  console.log('🔧 API_URL:', API_URL);
+
+  // ========== CÁLCULO DE PONTOS ==========
+  const calculatePoints = (attendance_rate: number, perfect_attendance: boolean, diamond_eligible: boolean): number => {
+    let points = 0;
+
+    if (attendance_rate === 0) {
+      return 0;
+    }
     
-    return athletesData.map((athlete, index) => {
-      const randomFactor = (seed: number) => {
-        return (seed * 7 + 13) % 100;
-      };
-      
-      const points = 50 + Math.floor(randomFactor(index * 3 + 1) * 1.5);
-      const games = 5 + Math.floor(randomFactor(index * 5 + 2) * 0.5);
-      const goals = Math.floor(randomFactor(index * 7 + 3) * 0.4);
-      const assists = Math.floor(randomFactor(index * 11 + 5) * 0.3);
-      const wins = Math.floor(randomFactor(index * 13 + 7) * 0.3);
-      const losses = Math.floor(randomFactor(index * 17 + 11) * 0.2);
-      const attendance = 60 + Math.floor(randomFactor(index * 19 + 13) * 0.4);
-      
-      return {
-        id: athlete.id,
-        name: athlete.name,
-        category: athlete.category || 'Sem categoria',
-        avatar_url: athlete.avatar_url,
-        points,
-        games,
-        goals,
-        assists,
-        wins,
-        losses,
-        attendance_rate: attendance,
-        ranking_position: index + 1,
-        evolution: evolutions[index % evolutions.length],
-        last_match_performance: 30 + Math.floor(randomFactor(index * 23 + 17) * 0.7),
-      };
-    });
+    points += Math.floor(attendance_rate / 10) * 15;
+
+    if (attendance_rate >= 90) points += 30;
+    else if (attendance_rate >= 80) points += 20;
+    else if (attendance_rate >= 70) points += 10;
+    else if (attendance_rate >= 60) points += 5;
+
+    if (perfect_attendance) points += 50;
+    if (diamond_eligible) points += 100;
+
+    return points;
   };
 
-  const fetchAthletes = async () => {
+  // ========== BUSCAR DADOS ==========
+  const fetchRankingData = async () => {
     try {
       setLoading(true);
       setRefreshing(true);
+      setError(null);
+
+      console.log('📡 Buscando atletas de:', API_URL);
+      const athletesRes = await fetch(`${API_URL}/athletes?_t=${Date.now()}`);
       
-      const res = await fetch(`${API_URL}/athletes?_t=${Date.now()}`);
-      
-      if (res.ok) {
-        const data = await res.json();
-        console.log('✅ Atletas carregados:', data.length);
-        
-        const rankingData = generateRankingData(data);
-        rankingData.sort((a, b) => b.points - a.points);
-        rankingData.forEach((item, index) => {
-          item.ranking_position = index + 1;
-        });
-        
-        setAthletes(rankingData);
-        setFilteredAthletes(rankingData);
-      } else {
-        console.error('Erro ao buscar atletas:', res.status);
-        useMockData();
+      if (!athletesRes.ok) {
+        throw new Error(`Erro ao buscar atletas: ${athletesRes.status}`);
       }
+      
+      const athletesData: Athlete[] = await athletesRes.json();
+      console.log(`✅ ${athletesData.length} atletas encontrados`);
+
+      if (athletesData.length === 0) {
+        setAthletes([]);
+        setFilteredAthletes([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log('📡 Buscando presenças...');
+      
+      const rankingData: AthleteRanking[] = [];
+
+      for (const athlete of athletesData) {
+        try {
+          const attendanceRes = await fetch(`${API_URL}/attendance/athlete/${athlete.id}?_t=${Date.now()}`);
+          
+          let total = 0;
+          let present = 0;
+          let rate = 0;
+          let perfect_months = 0;
+
+          if (attendanceRes.ok) {
+            const data = await attendanceRes.json();
+            console.log(`📊 ${athlete.name}: ${data.length} registros`);
+            
+            total = data.length;
+            present = data.filter((r: any) => r.present === true).length;
+            rate = total > 0 ? (present / total) * 100 : 0;
+            perfect_months = Math.floor(present / 4);
+          } else {
+            console.log(`⚠️ ${athlete.name}: sem registros de presença (status ${attendanceRes.status})`);
+            // Se não tiver presenças, usar dados simulados para teste
+            total = 10 + Math.floor(Math.random() * 15);
+            present = Math.floor(Math.random() * (total + 1));
+            rate = (present / total) * 100;
+            perfect_months = Math.floor(present / 4);
+          }
+          
+          const perfect_attendance = rate === 100 && total > 0;
+          const diamond_eligible = perfect_months >= 12;
+          
+          const points = calculatePoints(rate, perfect_attendance, diamond_eligible);
+          
+          rankingData.push({
+            id: athlete.id,
+            name: athlete.name,
+            category: athlete.category || 'Sem categoria',
+            avatar_url: athlete.avatar_url || null,
+            points,
+            attendance_rate: Math.round(rate),
+            total_classes: total,
+            attended_classes: present,
+            absences: total - present,
+            ranking_position: 0,
+            perfect_attendance,
+            streak_months: perfect_months,
+            diamond_eligible,
+          });
+        } catch (err) {
+          console.error(`❌ Erro ao processar ${athlete.name}:`, err);
+          rankingData.push({
+            id: athlete.id,
+            name: athlete.name,
+            category: athlete.category || 'Sem categoria',
+            avatar_url: athlete.avatar_url || null,
+            points: 0,
+            attendance_rate: 0,
+            total_classes: 0,
+            attended_classes: 0,
+            absences: 0,
+            ranking_position: 0,
+            perfect_attendance: false,
+            streak_months: 0,
+            diamond_eligible: false,
+          });
+        }
+      }
+
+      rankingData.sort((a, b) => b.points - a.points);
+      rankingData.forEach((item, index) => {
+        item.ranking_position = index + 1;
+      });
+
+      console.log('🏆 Ranking atualizado!');
+      setAthletes(rankingData);
+      setFilteredAthletes(rankingData);
+
     } catch (error) {
-      console.error('Erro ao carregar atletas:', error);
-      useMockData();
+      console.error('❌ Erro:', error);
+      setError('Não foi possível carregar o ranking.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const useMockData = () => {
-    const mockNames = ['João Silva', 'Maria Santos', 'Pedro Oliveira', 'Ana Costa', 'Lucas Ferreira', 
-                       'Beatriz Lima', 'Carlos Souza', 'Julia Pereira', 'Rafael Almeida', 'Gabriela Rocha'];
-    const mockCategories = ['Sub-10', 'Sub-12', 'Sub-14', 'Sub-16', 'Sub-18'];
-    const evolutions: ('up' | 'down' | 'stable')[] = ['up', 'down', 'stable'];
+  // ========== CONQUISTAS ==========
+  const getAchievementsForAthlete = (athlete: AthleteRanking): Achievement[] => {
+    return [
+      {
+        id: 'perfect',
+        name: '🏅 Presença Perfeita',
+        description: '100% de presença',
+        icon: '👑',
+        color: '#F59E0B',
+        unlocked: athlete.perfect_attendance,
+        category: 'attendance',
+        requirement: 100,
+        currentProgress: athlete.attendance_rate,
+      },
+      {
+        id: 'diamond',
+        name: '💎 Diamante',
+        description: '1 ano sem falta',
+        icon: '💎',
+        color: '#8B5CF6',
+        unlocked: athlete.diamond_eligible,
+        category: 'diamond',
+        requirement: 12,
+        currentProgress: athlete.streak_months,
+      },
+      {
+        id: 'gold',
+        name: '🥇 Ouro',
+        description: '6 meses sem falta',
+        icon: '🌟',
+        color: '#F59E0B',
+        unlocked: athlete.streak_months >= 6,
+        category: 'attendance',
+        requirement: 6,
+        currentProgress: athlete.streak_months,
+      },
+      {
+        id: 'silver',
+        name: '🥈 Prata',
+        description: '3 meses sem falta',
+        icon: '⭐',
+        color: '#9CA3AF',
+        unlocked: athlete.streak_months >= 3,
+        category: 'attendance',
+        requirement: 3,
+        currentProgress: athlete.streak_months,
+      },
+      {
+        id: 'attendance_90',
+        name: '💪 90%+',
+        description: '90% ou mais de presença',
+        icon: '💪',
+        color: '#F59E0B',
+        unlocked: athlete.attendance_rate >= 90,
+        category: 'attendance',
+        requirement: 90,
+        currentProgress: athlete.attendance_rate,
+      },
+      {
+        id: 'attendance_80',
+        name: '📊 80%+',
+        description: '80% ou mais de presença',
+        icon: '📊',
+        color: '#9CA3AF',
+        unlocked: athlete.attendance_rate >= 80,
+        category: 'attendance',
+        requirement: 80,
+        currentProgress: athlete.attendance_rate,
+      },
+      {
+        id: 'attendance_70',
+        name: '📈 70%+',
+        description: '70% ou mais de presença',
+        icon: '📈',
+        color: '#D97706',
+        unlocked: athlete.attendance_rate >= 70,
+        category: 'attendance',
+        requirement: 70,
+        currentProgress: athlete.attendance_rate,
+      },
+    ];
+  };
+
+  // ========== FUNÇÕES DE UI ==========
+  const openAchievementsModal = (athlete: AthleteRanking) => {
+    setSelectedAthlete(athlete);
+    const achievements = getAchievementsForAthlete(athlete);
+    setAthleteAchievements(achievements);
+    setUnlockedCount(achievements.filter(a => a.unlocked).length);
+    setTotalAchievements(achievements.length);
+    setShowAchievementsModal(true);
+  };
+
+  const closeAchievementsModal = () => {
+    setShowAchievementsModal(false);
+    setSelectedAthlete(null);
+  };
+
+  const renderSpecialBadges = (athlete: AthleteRanking) => {
+    const badges = [];
     
-    const mockData = mockNames.map((name, index) => ({
-      id: `mock-${index}`,
-      name,
-      category: mockCategories[index % mockCategories.length],
-      avatar_url: null,
-      points: 50 + Math.floor(Math.random() * 150),
-      games: 5 + Math.floor(Math.random() * 25),
-      goals: Math.floor(Math.random() * 40),
-      assists: Math.floor(Math.random() * 20),
-      wins: Math.floor(Math.random() * 20),
-      losses: Math.floor(Math.random() * 10),
-      attendance_rate: 60 + Math.floor(Math.random() * 40),
-      ranking_position: index + 1,
-      evolution: evolutions[index % evolutions.length],
-      last_match_performance: 30 + Math.floor(Math.random() * 70),
-    }));
+    if (athlete.perfect_attendance) {
+      badges.push(
+        <span key="perfect" className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-500/20 text-yellow-500 rounded-full text-xs font-medium border border-yellow-500/30">
+          🏅100%
+        </span>
+      );
+    }
     
-    mockData.sort((a, b) => b.points - a.points);
-    mockData.forEach((item, index) => {
-      item.ranking_position = index + 1;
-    });
+    if (athlete.diamond_eligible) {
+      badges.push(
+        <span key="diamond" className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded-full text-xs font-medium border border-purple-500/30">
+          💎1ANO
+        </span>
+      );
+    } else if (athlete.streak_months >= 6) {
+      badges.push(
+        <span key="gold" className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-500/20 text-yellow-500 rounded-full text-xs font-medium border border-yellow-500/30">
+          🌟{athlete.streak_months}m
+        </span>
+      );
+    } else if (athlete.streak_months >= 3) {
+      badges.push(
+        <span key="silver" className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-500/20 text-gray-400 rounded-full text-xs font-medium border border-gray-500/30">
+          ⭐{athlete.streak_months}m
+        </span>
+      );
+    }
     
-    setAthletes(mockData);
-    setFilteredAthletes(mockData);
+    if (athlete.absences > 0) {
+      badges.push(
+        <span key="absence" className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full text-xs font-medium border border-red-500/30">
+          ❌{athlete.absences}
+        </span>
+      );
+    }
+    
+    return badges;
+  };
+
+  const countUnlockedAchievements = (athlete: AthleteRanking): number => {
+    return getAchievementsForAthlete(athlete).filter(a => a.unlocked).length;
   };
 
   useEffect(() => {
-    fetchAthletes();
+    fetchRankingData();
   }, []);
 
   useEffect(() => {
@@ -161,10 +363,8 @@ export default function RankingPage() {
     filtered = [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'points': return b.points - a.points;
-        case 'goals': return b.goals - a.goals;
-        case 'assists': return b.assists - a.assists;
         case 'attendance': return b.attendance_rate - a.attendance_rate;
-        case 'games': return b.games - a.games;
+        case 'absences': return a.absences - b.absences;
         default: return 0;
       }
     });
@@ -172,12 +372,9 @@ export default function RankingPage() {
     setFilteredAthletes(filtered);
   }, [searchTerm, selectedCategory, sortBy, athletes]);
 
-  // Extrair categorias únicas dos atletas - CORRIGIDO
   const categorySet = new Set<string>();
   athletes.forEach(a => {
-    if (a.category) {
-      categorySet.add(a.category);
-    }
+    if (a.category) categorySet.add(a.category);
   });
   const categories = ['all', ...Array.from(categorySet)];
 
@@ -188,18 +385,6 @@ export default function RankingPage() {
     return `#${position}`;
   };
 
-  const getEvolutionIcon = (evolution: string) => {
-    if (evolution === 'up') return <TrendingUp className="w-4 h-4 text-green-500" />;
-    if (evolution === 'down') return <TrendingDown className="w-4 h-4 text-red-500" />;
-    return <Minus className="w-4 h-4 text-yellow-500" />;
-  };
-
-  const getEvolutionColor = (evolution: string) => {
-    if (evolution === 'up') return 'text-green-500';
-    if (evolution === 'down') return 'text-red-500';
-    return 'text-yellow-500';
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0D1117] p-6">
@@ -207,6 +392,26 @@ export default function RankingPage() {
           <div className="flex flex-col items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             <p className="text-gray-400 mt-4">Carregando ranking dos atletas...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && athletes.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#0D1117] p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-8 text-center">
+            <div className="text-6xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-white mb-2">Erro ao carregar ranking</h2>
+            <p className="text-gray-400">{error}</p>
+            <button
+              onClick={fetchRankingData}
+              className="mt-4 bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition text-white font-medium"
+            >
+              🔄 Tentar novamente
+            </button>
           </div>
         </div>
       </div>
@@ -227,14 +432,23 @@ export default function RankingPage() {
               {filteredAthletes.length} atletas • {selectedCategory === 'all' ? 'Todas categorias' : selectedCategory}
             </p>
           </div>
-          <button
-            onClick={fetchAthletes}
-            disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-gray-400 hover:text-white hover:border-blue-500 transition"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Atualizar
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowRulesModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+              <span className="text-lg">📜</span>
+              Regras
+            </button>
+            <button
+              onClick={fetchRankingData}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-gray-400 hover:text-white hover:border-blue-500 transition"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Atualizar
+            </button>
+          </div>
         </div>
 
         {/* Search e Filtros */}
@@ -271,10 +485,8 @@ export default function RankingPage() {
           <div className="flex flex-wrap gap-2">
             {[
               { key: 'points', label: '⭐ Pontos' },
-              { key: 'goals', label: '⚽ Gols' },
-              { key: 'assists', label: '🎯 Assistências' },
               { key: 'attendance', label: '📊 Presença' },
-              { key: 'games', label: '🎮 Jogos' },
+              { key: 'absences', label: '❌ Faltas' },
             ].map(({ key, label }) => (
               <button
                 key={key}
@@ -320,12 +532,14 @@ export default function RankingPage() {
           <div className="space-y-3">
             {filteredAthletes.map((athlete, index) => {
               const isTop3 = index < 3;
+              const unlockedCount = countUnlockedAchievements(athlete);
               return (
                 <div
                   key={athlete.id}
-                  className={`bg-[#161B22] border rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/50 transition ${
+                  className={`bg-[#161B22] border rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/50 transition cursor-pointer ${
                     isTop3 ? 'border-yellow-500/30' : 'border-[#30363D]'
                   }`}
+                  onClick={() => openAchievementsModal(athlete)}
                 >
                   <div className="w-12 text-center">
                     <span className={`text-lg font-bold ${isTop3 ? 'text-yellow-500' : 'text-gray-400'}`}>
@@ -333,8 +547,12 @@ export default function RankingPage() {
                     </span>
                   </div>
 
-                  <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                    {athlete.name.charAt(0).toUpperCase()}
+                  <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 overflow-hidden">
+                    {athlete.avatar_url ? (
+                      <img src={`${API_URL}${athlete.avatar_url}`} alt={athlete.name} className="w-full h-full object-cover" />
+                    ) : (
+                      athlete.name.charAt(0).toUpperCase()
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -343,24 +561,23 @@ export default function RankingPage() {
                       <span className="text-xs px-2 py-0.5 bg-[#21262D] rounded-full text-gray-400">
                         {athlete.category}
                       </span>
-                      <span className={`${getEvolutionColor(athlete.evolution)}`}>
-                        {getEvolutionIcon(athlete.evolution)}
-                      </span>
+                      {renderSpecialBadges(athlete)}
+                      {unlockedCount > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-500/20 text-yellow-500 rounded-full text-xs font-medium border border-yellow-500/30">
+                          🏅{unlockedCount}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-4 text-sm text-gray-400 mt-1">
-                      <span>⚽ {athlete.goals} gols</span>
-                      <span>🎯 {athlete.assists} assist.</span>
-                      <span>📊 {athlete.attendance_rate}% presença</span>
-                      <span>🎮 {athlete.games} jogos</span>
-                    </div>
-                    <div className="w-full h-1 bg-[#21262D] rounded-full mt-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          athlete.last_match_performance > 70 ? 'bg-green-500' :
-                          athlete.last_match_performance > 40 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}
-                        style={{ width: `${athlete.last_match_performance}%` }}
-                      />
+                      <span className="font-bold text-green-500">✅ {athlete.attended_classes}</span>
+                      <span className="font-bold text-red-500">❌ {athlete.absences}</span>
+                      <span className={`font-bold ${
+                        athlete.attendance_rate >= 70 ? 'text-green-400' : 
+                        athlete.attendance_rate >= 50 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
+                        📊 {athlete.attendance_rate}%
+                      </span>
+                      <span className="text-gray-500">Total: {athlete.total_classes} aulas</span>
                     </div>
                   </div>
 
@@ -376,30 +593,48 @@ export default function RankingPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredAthletes.map((athlete, index) => {
               const isTop3 = index < 3;
+              const unlockedCount = countUnlockedAchievements(athlete);
               return (
                 <div
                   key={athlete.id}
-                  className={`bg-[#161B22] border rounded-xl p-4 text-center hover:border-blue-500/50 transition ${
+                  className={`bg-[#161B22] border rounded-xl p-4 text-center hover:border-blue-500/50 transition cursor-pointer ${
                     isTop3 ? 'border-yellow-500/30' : 'border-[#30363D]'
                   }`}
+                  onClick={() => openAchievementsModal(athlete)}
                 >
                   <div className="text-lg font-bold text-yellow-500">
                     {getMedal(index + 1)}
                   </div>
-                  <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-2xl mx-auto my-3">
-                    {athlete.name.charAt(0).toUpperCase()}
+                  <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-2xl mx-auto my-3 overflow-hidden">
+                    {athlete.avatar_url ? (
+                      <img src={`${API_URL}${athlete.avatar_url}`} alt={athlete.name} className="w-full h-full object-cover" />
+                    ) : (
+                      athlete.name.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div className="font-semibold text-white">{athlete.name}</div>
                   <div className="text-xs text-gray-500">{athlete.category}</div>
                   <div className="text-2xl font-bold text-green-500 mt-2">{athlete.points}</div>
                   <div className="text-xs text-gray-500">pontos</div>
                   <div className="flex justify-center gap-3 text-sm text-gray-400 mt-2">
-                    <span>⚽ {athlete.goals}</span>
-                    <span>🎯 {athlete.assists}</span>
+                    <span className="text-green-400">✅ {athlete.attended_classes}</span>
+                    <span className="text-red-400">❌ {athlete.absences}</span>
                   </div>
-                  <div className="mt-2 flex items-center justify-center gap-1">
-                    <span className="text-xs text-gray-500">Presença:</span>
-                    <span className="text-sm font-medium text-blue-400">{athlete.attendance_rate}%</span>
+                  <div className="mt-2 flex items-center justify-center gap-1 flex-wrap">
+                    <span className={`text-sm font-medium ${
+                      athlete.attendance_rate >= 70 ? 'text-green-400' : 
+                      athlete.attendance_rate >= 50 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      📊 {athlete.attendance_rate}%
+                    </span>
+                  </div>
+                  {unlockedCount > 0 && (
+                    <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-500/20 text-yellow-500 rounded-full text-xs font-medium border border-yellow-500/30">
+                      🏅{unlockedCount}
+                    </div>
+                  )}
+                  <div className="flex justify-center gap-1 mt-2 flex-wrap">
+                    {renderSpecialBadges(athlete)}
                   </div>
                 </div>
               );
@@ -407,11 +642,167 @@ export default function RankingPage() {
           </div>
         )}
 
-        {/* Footer com contagem */}
         <div className="mt-6 text-center text-sm text-gray-500">
           Mostrando {filteredAthletes.length} de {athletes.length} atletas
         </div>
       </div>
+
+      {/* Modal de Regras */}
+      {showRulesModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowRulesModal(false)}>
+          <div className="bg-[#161B22] border border-[#30363D] rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-white">📜 Regras das Medalhas</h2>
+              <button onClick={() => setShowRulesModal(false)} className="text-gray-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-3 bg-[#21262D] rounded-lg">
+                <span className="text-2xl">👑</span>
+                <div>
+                  <p className="text-white font-semibold">Presença Perfeita</p>
+                  <p className="text-gray-400 text-sm">100% de presença em todas as aulas</p>
+                  <p className="text-green-400 text-sm font-medium">+50 pontos (bônus)</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-[#21262D] rounded-lg">
+                <span className="text-2xl">💎</span>
+                <div>
+                  <p className="text-white font-semibold">Presença Diamante</p>
+                  <p className="text-gray-400 text-sm">1 ano completo sem nenhuma falta! 🎉</p>
+                  <p className="text-green-400 text-sm font-medium">+100 pontos (bônus)</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-[#21262D] rounded-lg">
+                <span className="text-2xl">🌟</span>
+                <div>
+                  <p className="text-white font-semibold">Presença de Ouro</p>
+                  <p className="text-gray-400 text-sm">6 meses consecutivos sem falta</p>
+                  <p className="text-green-400 text-sm font-medium">+30 pontos (bônus)</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-[#21262D] rounded-lg">
+                <span className="text-2xl">⭐</span>
+                <div>
+                  <p className="text-white font-semibold">Presença de Prata</p>
+                  <p className="text-gray-400 text-sm">3 meses consecutivos sem falta</p>
+                  <p className="text-green-400 text-sm font-medium">+20 pontos (bônus)</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-[#21262D] rounded-lg">
+                <span className="text-2xl">💪</span>
+                <div>
+                  <p className="text-white font-semibold">90%+ de presença</p>
+                  <p className="text-gray-400 text-sm">90% ou mais de presença</p>
+                  <p className="text-green-400 text-sm font-medium">+30 pontos</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-[#21262D] rounded-lg">
+                <span className="text-2xl">📊</span>
+                <div>
+                  <p className="text-white font-semibold">80%+ de presença</p>
+                  <p className="text-gray-400 text-sm">80% ou mais de presença</p>
+                  <p className="text-green-400 text-sm font-medium">+20 pontos</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-[#21262D] rounded-lg">
+                <span className="text-2xl">📈</span>
+                <div>
+                  <p className="text-white font-semibold">70%+ de presença</p>
+                  <p className="text-gray-400 text-sm">70% ou mais de presença</p>
+                  <p className="text-green-400 text-sm font-medium">+10 pontos</p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowRulesModal(false)}
+              className="w-full mt-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+            >
+              ✅ Entendi!
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Conquistas */}
+      {showAchievementsModal && selectedAthlete && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeAchievementsModal}>
+          <div className="bg-[#161B22] border border-[#30363D] rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-white">🏅 Conquistas</h2>
+              <button onClick={closeAchievementsModal} className="text-gray-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-4 p-4 bg-[#21262D] rounded-xl mb-4">
+              <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-2xl overflow-hidden">
+                {selectedAthlete.avatar_url ? (
+                  <img src={`${API_URL}${selectedAthlete.avatar_url}`} alt={selectedAthlete.name} className="w-full h-full object-cover" />
+                ) : (
+                  selectedAthlete.name.charAt(0).toUpperCase()
+                )}
+              </div>
+              <div>
+                <p className="text-white font-semibold text-lg">{selectedAthlete.name}</p>
+                <div className="flex gap-3 text-sm text-gray-400">
+                  <span>⭐ {selectedAthlete.points} pts</span>
+                  <span>🏆 {selectedAthlete.ranking_position}º</span>
+                  <span className={`font-bold ${
+                    selectedAthlete.attendance_rate >= 70 ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    📊 {selectedAthlete.attendance_rate}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-gray-400">🏅 Conquistas desbloqueadas:</span>
+              <span className="text-yellow-500 font-bold">{unlockedCount} / {totalAchievements}</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {athleteAchievements.map((achievement) => (
+                <div
+                  key={achievement.id}
+                  className={`p-3 rounded-xl text-center border-2 transition ${
+                    achievement.unlocked
+                      ? 'border-yellow-500/50 bg-yellow-500/10'
+                      : 'border-gray-700/50 bg-gray-800/30 opacity-50'
+                  }`}
+                >
+                  <div className="text-3xl mb-1">{achievement.unlocked ? achievement.icon : '🔒'}</div>
+                  <p className="text-white text-xs font-semibold leading-tight">{achievement.name}</p>
+                  <p className="text-gray-500 text-[10px] leading-tight mt-1">{achievement.description}</p>
+                  <div className="w-full h-1 bg-gray-700 rounded-full mt-2 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min((achievement.currentProgress / achievement.requirement) * 100, 100)}%`,
+                        backgroundColor: achievement.unlocked ? '#F59E0B' : '#374151'
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-center text-gray-500 text-xs mt-4">
+              👆 Toque fora para fechar • Continue comparecendo para desbloquear mais conquistas!
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

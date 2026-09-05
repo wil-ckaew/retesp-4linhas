@@ -1,5 +1,4 @@
 // backend/src/migrations.rs
-// backend/src/migrations.rs
 use sqlx::PgPool;
 
 pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
@@ -44,7 +43,7 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
     
-    // Criar tabela athletes
+    // Criar tabela athletes com todos os campos
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS athletes (
@@ -54,6 +53,14 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
             category VARCHAR(50) NOT NULL,
             avatar_url TEXT,
             medical_form_url TEXT,
+            phone VARCHAR(20),
+            address TEXT,
+            neighborhood VARCHAR(100),
+            city VARCHAR(100),
+            state VARCHAR(2),
+            zip_code VARCHAR(10),
+            emergency_contact VARCHAR(255),
+            emergency_phone VARCHAR(20),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -191,11 +198,46 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
     
+    // Adicionar colunas se não existirem (para compatibilidade)
+    sqlx::query("ALTER TABLE athletes ADD COLUMN IF NOT EXISTS phone VARCHAR(20)")
+        .execute(pool)
+        .await?;
+    sqlx::query("ALTER TABLE athletes ADD COLUMN IF NOT EXISTS address TEXT")
+        .execute(pool)
+        .await?;
+    sqlx::query("ALTER TABLE athletes ADD COLUMN IF NOT EXISTS neighborhood VARCHAR(100)")
+        .execute(pool)
+        .await?;
+    sqlx::query("ALTER TABLE athletes ADD COLUMN IF NOT EXISTS city VARCHAR(100)")
+        .execute(pool)
+        .await?;
+    sqlx::query("ALTER TABLE athletes ADD COLUMN IF NOT EXISTS state VARCHAR(2)")
+        .execute(pool)
+        .await?;
+    sqlx::query("ALTER TABLE athletes ADD COLUMN IF NOT EXISTS zip_code VARCHAR(10)")
+        .execute(pool)
+        .await?;
+    sqlx::query("ALTER TABLE athletes ADD COLUMN IF NOT EXISTS emergency_contact VARCHAR(255)")
+        .execute(pool)
+        .await?;
+    sqlx::query("ALTER TABLE athletes ADD COLUMN IF NOT EXISTS emergency_phone VARCHAR(20)")
+        .execute(pool)
+        .await?;
+    
     // Índices
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_stories_expires_at ON stories(expires_at)")
         .execute(pool)
         .await?;
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_stories_created_at ON stories(created_at DESC)")
+        .execute(pool)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_athletes_phone ON athletes(phone)")
+        .execute(pool)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_athletes_city ON athletes(city)")
+        .execute(pool)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_athletes_state ON athletes(state)")
         .execute(pool)
         .await?;
     

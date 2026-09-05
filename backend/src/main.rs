@@ -35,7 +35,15 @@ struct CreateAthleteRequest {
     birth_date: String, 
     category: String, 
     avatar_url: Option<String>,
-    medical_form_url: Option<String>
+    medical_form_url: Option<String>,
+    phone: Option<String>,
+    address: Option<String>,
+    neighborhood: Option<String>,
+    city: Option<String>,
+    state: Option<String>,
+    zip_code: Option<String>,
+    emergency_contact: Option<String>,
+    emergency_phone: Option<String>,
 }
 
 #[derive(Serialize)] 
@@ -45,7 +53,15 @@ struct AthleteResponse {
     birth_date: String, 
     category: String, 
     avatar_url: Option<String>,
-    medical_form_url: Option<String>
+    medical_form_url: Option<String>,
+    phone: Option<String>,
+    address: Option<String>,
+    neighborhood: Option<String>,
+    city: Option<String>,
+    state: Option<String>,
+    zip_code: Option<String>,
+    emergency_contact: Option<String>,
+    emergency_phone: Option<String>,
 }
 
 #[derive(Deserialize)] 
@@ -196,8 +212,10 @@ async fn login(req: web::Json<LoginRequest>, pool: web::Data<PgPool>) -> impl Re
 
 // ATLETAS
 async fn list_athletes(pool: web::Data<PgPool>) -> impl Responder {
-    let rows = sqlx::query_as::<_, (Uuid, String, String, String, Option<String>, Option<String>)>(
-        "SELECT id, name, birth_date::text, category, avatar_url, medical_form_url FROM athletes ORDER BY created_at DESC"
+    let rows = sqlx::query_as::<_, (Uuid, String, String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)>(
+        "SELECT id, name, birth_date::text, category, avatar_url, medical_form_url, 
+                phone, address, neighborhood, city, state, zip_code, emergency_contact, emergency_phone 
+         FROM athletes ORDER BY created_at DESC"
     )
     .fetch_all(&**pool)
     .await;
@@ -210,7 +228,15 @@ async fn list_athletes(pool: web::Data<PgPool>) -> impl Responder {
                 birth_date: r.2.clone(), 
                 category: r.3.clone(), 
                 avatar_url: r.4.clone(),
-                medical_form_url: r.5.clone()
+                medical_form_url: r.5.clone(),
+                phone: r.6.clone(),
+                address: r.7.clone(),
+                neighborhood: r.8.clone(),
+                city: r.9.clone(),
+                state: r.10.clone(),
+                zip_code: r.11.clone(),
+                emergency_contact: r.12.clone(),
+                emergency_phone: r.13.clone(),
             }).collect();
             HttpResponse::Ok().json(athletes)
         }
@@ -233,13 +259,26 @@ async fn create_athlete(req: web::Json<CreateAthleteRequest>, pool: web::Data<Pg
     }
     
     match sqlx::query(
-        "INSERT INTO athletes (name, birth_date, category, avatar_url, medical_form_url) VALUES ($1, $2::date, $3, $4, $5)"
+        r#"
+        INSERT INTO athletes (name, birth_date, category, avatar_url, medical_form_url, 
+                              phone, address, neighborhood, city, state, zip_code, 
+                              emergency_contact, emergency_phone) 
+        VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        "#
     )
     .bind(&req.name)
     .bind(&req.birth_date)
     .bind(&req.category)
     .bind(&req.avatar_url)
     .bind(&req.medical_form_url)
+    .bind(&req.phone)
+    .bind(&req.address)
+    .bind(&req.neighborhood)
+    .bind(&req.city)
+    .bind(&req.state)
+    .bind(&req.zip_code)
+    .bind(&req.emergency_contact)
+    .bind(&req.emergency_phone)
     .execute(&**pool).await {
         Ok(_) => HttpResponse::Ok().json("Atleta cadastrado com sucesso!"),
         Err(e) => {
@@ -251,8 +290,10 @@ async fn create_athlete(req: web::Json<CreateAthleteRequest>, pool: web::Data<Pg
 
 async fn get_athlete(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
     let id = path.into_inner();
-    let row = sqlx::query_as::<_, (Uuid, String, String, String, Option<String>, Option<String>)>(
-        "SELECT id, name, birth_date::text, category, avatar_url, medical_form_url FROM athletes WHERE id = $1"
+    let row = sqlx::query_as::<_, (Uuid, String, String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)>(
+        "SELECT id, name, birth_date::text, category, avatar_url, medical_form_url,
+                phone, address, neighborhood, city, state, zip_code, emergency_contact, emergency_phone 
+         FROM athletes WHERE id = $1"
     )
     .bind(id)
     .fetch_optional(&**pool)
@@ -265,7 +306,15 @@ async fn get_athlete(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Res
             birth_date: r.2.clone(), 
             category: r.3.clone(), 
             avatar_url: r.4.clone(),
-            medical_form_url: r.5.clone()
+            medical_form_url: r.5.clone(),
+            phone: r.6.clone(),
+            address: r.7.clone(),
+            neighborhood: r.8.clone(),
+            city: r.9.clone(),
+            state: r.10.clone(),
+            zip_code: r.11.clone(),
+            emergency_contact: r.12.clone(),
+            emergency_phone: r.13.clone(),
         }),
         Ok(None) => HttpResponse::NotFound().body("Atleta não encontrado"),
         Err(e) => {
@@ -288,13 +337,37 @@ async fn update_athlete(path: web::Path<Uuid>, req: web::Json<CreateAthleteReque
     }
     
     match sqlx::query(
-        "UPDATE athletes SET name = $1, birth_date = $2::date, category = $3, avatar_url = $4, medical_form_url = $5 WHERE id = $6"
+        r#"
+        UPDATE athletes SET 
+            name = $1, 
+            birth_date = $2::date, 
+            category = $3, 
+            avatar_url = $4, 
+            medical_form_url = $5,
+            phone = $6,
+            address = $7,
+            neighborhood = $8,
+            city = $9,
+            state = $10,
+            zip_code = $11,
+            emergency_contact = $12,
+            emergency_phone = $13
+        WHERE id = $14
+        "#
     )
     .bind(&req.name)
     .bind(&req.birth_date)
     .bind(&req.category)
     .bind(&req.avatar_url)
     .bind(&req.medical_form_url)
+    .bind(&req.phone)
+    .bind(&req.address)
+    .bind(&req.neighborhood)
+    .bind(&req.city)
+    .bind(&req.state)
+    .bind(&req.zip_code)
+    .bind(&req.emergency_contact)
+    .bind(&req.emergency_phone)
     .bind(id)
     .execute(&**pool).await {
         Ok(_) => HttpResponse::Ok().json("Atleta atualizado com sucesso!"),
@@ -993,7 +1066,6 @@ async fn delete_expired_stories(pool: web::Data<PgPool>) -> impl Responder {
 }
 
 // --- UPLOAD ---
-// --- UPLOAD CORRIGIDO ---
 async fn upload_media(mut payload: Multipart, pool: web::Data<PgPool>) -> impl Responder {
     let upload_dir = "./uploads";
     if !Path::new(upload_dir).exists() {
@@ -1033,10 +1105,8 @@ async fn upload_media(mut payload: Multipart, pool: web::Data<PgPool>) -> impl R
         None => return HttpResponse::BadRequest().body("Nenhum arquivo enviado"),
     };
 
-    // CORREÇÃO: Usar o nome do arquivo enviado ou gerar um nome único
     let filename = match filename {
         Some(fname) => {
-            // Limpar caracteres especiais e espaços
             let clean = fname
                 .replace(" ", "_")
                 .replace("%20", "_")
@@ -1048,7 +1118,6 @@ async fn upload_media(mut payload: Multipart, pool: web::Data<PgPool>) -> impl R
                 .replace("[", "_")
                 .replace("]", "_");
             
-            // Se não tiver extensão, adicionar .bin
             if !clean.contains('.') {
                 format!("{}.bin", clean)
             } else {
@@ -1222,7 +1291,6 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Erro ao conectar no banco");
     
-    // Executar migrações automaticamente
     if let Err(e) = migrations::run_migrations(&pool).await {
         eprintln!("❌ Erro ao executar migrações: {}", e);
     }
@@ -1266,7 +1334,6 @@ async fn main() -> std::io::Result<()> {
             .route("/social/feed", web::get().to(get_social_feed))
             .route("/social/posts", web::post().to(create_post))
             .route("/social/posts/{id}", web::delete().to(delete_post))
-            // NOVAS ROTAS DE STORIES
             .route("/social/stories", web::get().to(list_stories))
             .route("/social/stories", web::post().to(create_story))
             .route("/social/stories/cleanup", web::delete().to(delete_expired_stories))

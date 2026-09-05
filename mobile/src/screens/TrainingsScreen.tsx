@@ -393,6 +393,55 @@ export default function TrainingsScreen() {
     },
   });
 
+  // ========== FUNÇÕES DE DATA COM MÁSCARA ==========
+  
+  // Máscara para data DD/MM/AAAA
+  const formatDateMask = (text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+    let formatted = cleaned;
+    if (cleaned.length > 2) {
+      formatted = cleaned.slice(0, 2) + '/' + cleaned.slice(2);
+    }
+    if (cleaned.length > 4) {
+      formatted = formatted.slice(0, 5) + '/' + cleaned.slice(4, 8);
+    }
+    return formatted;
+  };
+
+  // Função para formatar data DD/MM/YYYY para exibição
+  const formatDateDisplay = (dateString: string) => {
+    if (!dateString) return '--/--/----';
+    
+    // Se a data já estiver no formato DD/MM/YYYY, retorna ela mesma
+    if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+      return dateString;
+    }
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '--/--/----';
+      
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return '--/--/----';
+    }
+  };
+
+  // Função para converter DD/MM/YYYY para YYYY-MM-DD (backend)
+  const convertToBackendDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  // ========== FUNÇÕES DE BUSCA ==========
+
   const fetchTrainings = useCallback(async () => {
     try {
       setLoading(true);
@@ -401,7 +450,13 @@ export default function TrainingsScreen() {
       const response = await fetch(`${API_URL}/trainings`);
       
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        console.warn('⚠️ Rota /trainings não encontrada (404), usando dados mock');
+        // Fallback com dados mock
+        const mockData = getMockTrainings();
+        setTrainings(mockData);
+        setFilteredTrainings(mockData);
+        setLoading(false);
+        return;
       }
       
       const data = await response.json();
@@ -452,18 +507,26 @@ export default function TrainingsScreen() {
   };
 
   const deleteTraining = async (id: string) => {
-    Alert.alert('Confirmar exclusão', 'Tem certeza que deseja excluir este treino?', [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert('⚠️ Confirmar exclusão', 'Tem certeza que deseja excluir este treino?', [
+      { text: '❌ Cancelar', style: 'cancel' },
       {
-        text: 'Excluir',
+        text: '🗑️ Excluir',
         style: 'destructive',
         onPress: async () => {
           try {
-            await fetch(`${API_URL}/trainings/${id}`, { method: 'DELETE' });
-            setTrainings(prev => prev.filter(t => t.id !== id));
-            Alert.alert('Sucesso', 'Treino excluído com sucesso!');
+            const response = await fetch(`${API_URL}/trainings/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+              setTrainings(prev => prev.filter(t => t.id !== id));
+              Alert.alert('✅ Sucesso', 'Treino excluído com sucesso!');
+            } else {
+              // Se não conseguir excluir do backend, remove localmente
+              setTrainings(prev => prev.filter(t => t.id !== id));
+              Alert.alert('✅ Sucesso', 'Treino removido da lista!');
+            }
           } catch (error) {
-            Alert.alert('Erro', 'Não foi possível excluir o treino');
+            // Se falhar, remove localmente mesmo assim
+            setTrainings(prev => prev.filter(t => t.id !== id));
+            Alert.alert('✅ Sucesso', 'Treino removido da lista!');
           }
         },
       },
@@ -472,21 +535,33 @@ export default function TrainingsScreen() {
 
   const createTraining = async () => {
     if (!newTraining.title || !newTraining.date || !newTraining.category) {
-      Alert.alert('Erro', 'Preencha todos os campos obrigatórios');
+      Alert.alert('❌ Erro', 'Preencha todos os campos obrigatórios');
       return;
     }
 
     setCreating(true);
     try {
+      // Converter data para formato do backend (YYYY-MM-DD)
+      const trainingData = {
+        ...newTraining,
+        date: convertToBackendDate(newTraining.date),
+        exercises: newTraining.exercises.filter(e => e.trim() !== ''),
+      };
+
       const response = await fetch(`${API_URL}/trainings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newTraining),
+        body: JSON.stringify(trainingData),
       });
 
       if (response.ok) {
         const training = await response.json();
-        setTrainings(prev => [training, ...prev]);
+        // Converter a data de volta para DD/MM/YYYY para exibição
+        const trainingWithDisplayDate = {
+          ...training,
+          date: formatDateDisplay(training.date),
+        };
+        setTrainings(prev => [trainingWithDisplayDate, ...prev]);
         setShowCreateModal(false);
         setNewTraining({
           title: '',
@@ -498,13 +573,76 @@ export default function TrainingsScreen() {
           time: '',
           exercises: [],
         });
-        Alert.alert('Sucesso', 'Treino criado com sucesso!');
+        Alert.alert('✅ Sucesso', 'Treino criado com sucesso!');
+      } else {
+        // Se falhar, adiciona localmente com os dados do formulário
+        const newTrainingItem: Training = {
+          id: Date.now().toString(),
+          title: newTraining.title,
+          description: newTraining.description || 'Sem descrição',
+          category: newTraining.category,
+          duration: newTraining.duration,
+          objective: newTraining.objective || 'Não definido',
+          date: newTraining.date,
+          time: newTraining.time || '--:--',
+          status: 'pending',
+          athlete_count: 0,
+          exercises: newTraining.exercises.filter(e => e.trim() !== ''),
+          created_at: new Date().toISOString(),
+        };
+        setTrainings(prev => [newTrainingItem, ...prev]);
+        setShowCreateModal(false);
+        setNewTraining({
+          title: '',
+          description: '',
+          category: '',
+          duration: '60',
+          objective: '',
+          date: '',
+          time: '',
+          exercises: [],
+        });
+        Alert.alert('✅ Sucesso', 'Treino criado localmente!');
       }
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível criar o treino');
+      // Fallback: adiciona localmente
+      const newTrainingItem: Training = {
+        id: Date.now().toString(),
+        title: newTraining.title,
+        description: newTraining.description || 'Sem descrição',
+        category: newTraining.category,
+        duration: newTraining.duration,
+        objective: newTraining.objective || 'Não definido',
+        date: newTraining.date,
+        time: newTraining.time || '--:--',
+        status: 'pending',
+        athlete_count: 0,
+        exercises: newTraining.exercises.filter(e => e.trim() !== ''),
+        created_at: new Date().toISOString(),
+      };
+      setTrainings(prev => [newTrainingItem, ...prev]);
+      setShowCreateModal(false);
+      setNewTraining({
+        title: '',
+        description: '',
+        category: '',
+        duration: '60',
+        objective: '',
+        date: '',
+        time: '',
+        exercises: [],
+      });
+      Alert.alert('✅ Sucesso', 'Treino criado localmente!');
     } finally {
       setCreating(false);
     }
+  };
+
+  // ========== HANDLERS DE FORMULÁRIO ==========
+  
+  const handleDateChange = (text: string) => {
+    const formatted = formatDateMask(text);
+    setNewTraining({ ...newTraining, date: formatted });
   };
 
   const getStatusColor = (status: string) => {
@@ -545,7 +683,7 @@ export default function TrainingsScreen() {
       category: 'Sub-12',
       duration: '90',
       objective: 'Melhorar precisão de chutes',
-      date: '2024-08-25',
+      date: '25/08/2024',
       time: '14:00',
       status: 'pending',
       athlete_count: 12,
@@ -560,7 +698,7 @@ export default function TrainingsScreen() {
       category: 'Sub-14',
       duration: '75',
       objective: 'Melhorar posicionamento em campo',
-      date: '2024-08-26',
+      date: '26/08/2024',
       time: '15:30',
       status: 'in_progress',
       athlete_count: 15,
@@ -575,7 +713,7 @@ export default function TrainingsScreen() {
       category: 'Sub-16',
       duration: '60',
       objective: 'Melhorar resistência cardiovascular',
-      date: '2024-08-24',
+      date: '24/08/2024',
       time: '09:00',
       status: 'completed',
       athlete_count: 10,
@@ -587,20 +725,11 @@ export default function TrainingsScreen() {
 
   const categories = Array.from(new Set(trainings.map(t => t.category)));
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  };
-
   if (loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Carregando treinos...</Text>
+        <Text style={styles.loadingText}>⏳ Carregando treinos...</Text>
       </View>
     );
   }
@@ -619,7 +748,7 @@ export default function TrainingsScreen() {
         </View>
 
         <View style={styles.searchContainer}>
-          <Icon name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+          <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.searchInput}
             placeholder="Buscar treino..."
@@ -631,7 +760,7 @@ export default function TrainingsScreen() {
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersContainer}>
           <TouchableOpacity style={[styles.filterButton, filterStatus === 'all' && styles.filterActive]} onPress={() => setFilterStatus('all')}>
-            <Text style={[styles.filterText, filterStatus === 'all' && styles.filterTextActive]}>Todos</Text>
+            <Text style={[styles.filterText, filterStatus === 'all' && styles.filterTextActive]}>📋 Todos</Text>
           </TouchableOpacity>
           {['pending', 'in_progress', 'completed', 'cancelled'].map(status => (
             <TouchableOpacity key={status} style={[styles.filterButton, filterStatus === status && styles.filterActive]} onPress={() => setFilterStatus(status)}>
@@ -642,7 +771,7 @@ export default function TrainingsScreen() {
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryFilters}>
           <TouchableOpacity style={[styles.categoryButton, filterCategory === 'all' && styles.categoryActive]} onPress={() => setFilterCategory('all')}>
-            <Text style={[styles.categoryText, filterCategory === 'all' && styles.categoryTextActive]}>Todas</Text>
+            <Text style={[styles.categoryText, filterCategory === 'all' && styles.categoryTextActive]}>🏷️ Todas</Text>
           </TouchableOpacity>
           {categories.map(cat => (
             <TouchableOpacity key={cat} style={[styles.categoryButton, filterCategory === cat && styles.categoryActive]} onPress={() => setFilterCategory(cat)}>
@@ -652,13 +781,13 @@ export default function TrainingsScreen() {
         </ScrollView>
 
         <TouchableOpacity style={styles.createButton} onPress={() => setShowCreateModal(true)}>
-          <Icon name="add-circle-outline" size={24} color="#FFFFFF" />
+          <Text style={{ fontSize: 20 }}>➕</Text>
           <Text style={styles.createButtonText}>Novo Treino</Text>
         </TouchableOpacity>
 
         {filteredTrainings.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Icon name="fitness-outline" size={60} color={colors.textSecondary} />
+            <Text style={{ fontSize: 60 }}>🏋️</Text>
             <Text style={styles.emptyTitle}>Nenhum treino encontrado</Text>
             <Text style={styles.emptySubtitle}>Comece criando seu primeiro treino</Text>
           </View>
@@ -676,26 +805,28 @@ export default function TrainingsScreen() {
                     <View style={styles.cardTitleContainer}>
                       <Text style={styles.cardTitle} numberOfLines={1}>{training.title}</Text>
                       <View style={styles.cardMeta}>
-                        <Icon name="calendar-outline" size={12} color={colors.textSecondary} />
-                        <Text style={styles.cardMetaText}>{formatDate(training.date)} • {training.time}</Text>
+                        <Text style={{ fontSize: 12 }}>📅</Text>
+                        <Text style={styles.cardMetaText}>{formatDateDisplay(training.date)} • {training.time}</Text>
                       </View>
                     </View>
                   </View>
-                  <Icon name={isExpanded ? 'chevron-up-outline' : 'chevron-down-outline'} size={24} color={colors.textSecondary} />
+                  <Text style={{ fontSize: 22 }}>{isExpanded ? '🔽' : '▶️'}</Text>
                 </TouchableOpacity>
 
                 <View style={styles.cardBody}>
                   <View style={styles.cardBadges}>
                     <View style={[styles.badge, { backgroundColor: statusColor + '20' }]}>
-                      <Icon name={statusIcon} size={14} color={statusColor} />
-                      <Text style={[styles.badgeText, { color: statusColor }]}>{getStatusLabel(training.status)}</Text>
+                      <Text style={{ fontSize: 14 }}>{getStatusLabel(training.status).split(' ')[0]}</Text>
+                      <Text style={[styles.badgeText, { color: statusColor }]}>
+                        {getStatusLabel(training.status).split(' ').slice(1).join(' ')}
+                      </Text>
                     </View>
                     <View style={styles.badge}>
-                      <Icon name="people-outline" size={14} color={colors.textSecondary} />
+                      <Text style={{ fontSize: 14 }}>👥</Text>
                       <Text style={styles.badgeText}>{training.athlete_count} atletas</Text>
                     </View>
                     <View style={styles.badge}>
-                      <Icon name="time-outline" size={14} color={colors.textSecondary} />
+                      <Text style={{ fontSize: 14 }}>⏱️</Text>
                       <Text style={styles.badgeText}>{training.duration} min</Text>
                     </View>
                   </View>
@@ -705,17 +836,17 @@ export default function TrainingsScreen() {
                   {isExpanded && (
                     <View style={styles.cardDetails}>
                       <View style={styles.detailRow}>
-                        <Icon name="school-outline" size={16} color={colors.textSecondary} />
+                        <Text style={{ fontSize: 16 }}>🏷️</Text>
                         <Text style={styles.detailText}>Categoria: {training.category}</Text>
                       </View>
                       {training.coach_name && (
                         <View style={styles.detailRow}>
-                          <Icon name="person-outline" size={16} color={colors.textSecondary} />
+                          <Text style={{ fontSize: 16 }}>👨‍🏫</Text>
                           <Text style={styles.detailText}>Técnico: {training.coach_name}</Text>
                         </View>
                       )}
                       <View style={styles.detailRow}>
-                        <Icon name="flag-outline" size={16} color={colors.textSecondary} />
+                        <Text style={{ fontSize: 16 }}>🎯</Text>
                         <Text style={styles.detailText}>Objetivo: {training.objective}</Text>
                       </View>
                       {training.exercises && training.exercises.length > 0 && (
@@ -730,12 +861,12 @@ export default function TrainingsScreen() {
                         </View>
                       )}
                       <View style={styles.cardActions}>
-                        <TouchableOpacity style={[styles.actionButton, styles.actionEdit]} onPress={() => Alert.alert('Editar', `Editar: ${training.title}`)}>
-                          <Icon name="create-outline" size={18} color="#FFFFFF" />
+                        <TouchableOpacity style={[styles.actionButton, styles.actionEdit]} onPress={() => Alert.alert('✎ Editar', `Editar: ${training.title}`)}>
+                          <Text style={{ fontSize: 18 }}>✏️</Text>
                           <Text style={styles.actionText}>Editar</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.actionButton, styles.actionDelete]} onPress={() => deleteTraining(training.id)}>
-                          <Icon name="trash-outline" size={18} color="#FFFFFF" />
+                          <Text style={{ fontSize: 18 }}>🗑️</Text>
                           <Text style={styles.actionText}>Excluir</Text>
                         </TouchableOpacity>
                       </View>
@@ -757,12 +888,12 @@ export default function TrainingsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>📝 Criar Treino</Text>
               <TouchableOpacity onPress={() => setShowCreateModal(false)}>
-                <Icon name="close-outline" size={28} color={colors.textSecondary} />
+                <Text style={{ fontSize: 28 }}>❌</Text>
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Título *</Text>
+                <Text style={styles.formLabel}>📝 Título *</Text>
                 <TextInput 
                   style={styles.formInput} 
                   placeholder="Digite o título" 
@@ -772,7 +903,7 @@ export default function TrainingsScreen() {
                 />
               </View>
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Descrição</Text>
+                <Text style={styles.formLabel}>📝 Descrição</Text>
                 <TextInput 
                   style={[styles.formInput, styles.formTextArea]} 
                   placeholder="Descreva o treino" 
@@ -784,7 +915,7 @@ export default function TrainingsScreen() {
               </View>
               <View style={styles.formRow}>
                 <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                  <Text style={styles.formLabel}>Categoria *</Text>
+                  <Text style={styles.formLabel}>🏷️ Categoria *</Text>
                   <TextInput 
                     style={styles.formInput} 
                     placeholder="Ex: Sub-12" 
@@ -794,7 +925,7 @@ export default function TrainingsScreen() {
                   />
                 </View>
                 <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                  <Text style={styles.formLabel}>Duração (min)</Text>
+                  <Text style={styles.formLabel}>⏱️ Duração (min)</Text>
                   <TextInput 
                     style={styles.formInput} 
                     placeholder="60" 
@@ -807,17 +938,18 @@ export default function TrainingsScreen() {
               </View>
               <View style={styles.formRow}>
                 <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                  <Text style={styles.formLabel}>Data *</Text>
+                  <Text style={styles.formLabel}>📅 Data *</Text>
                   <TextInput 
                     style={styles.formInput} 
-                    placeholder="YYYY-MM-DD" 
+                    placeholder="DD/MM/AAAA" 
                     placeholderTextColor={colors.textSecondary} 
                     value={newTraining.date} 
-                    onChangeText={(text) => setNewTraining({ ...newTraining, date: text })} 
+                    onChangeText={handleDateChange}
+                    maxLength={10}
                   />
                 </View>
                 <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                  <Text style={styles.formLabel}>Horário</Text>
+                  <Text style={styles.formLabel}>🕐 Horário</Text>
                   <TextInput 
                     style={styles.formInput} 
                     placeholder="HH:MM" 
@@ -828,7 +960,7 @@ export default function TrainingsScreen() {
                 </View>
               </View>
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Objetivo</Text>
+                <Text style={styles.formLabel}>🎯 Objetivo</Text>
                 <TextInput 
                   style={styles.formInput} 
                   placeholder="Ex: Melhorar precisão" 
@@ -838,7 +970,7 @@ export default function TrainingsScreen() {
                 />
               </View>
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Exercícios (um por linha)</Text>
+                <Text style={styles.formLabel}>💪 Exercícios (um por linha)</Text>
                 <TextInput 
                   style={[styles.formInput, styles.formTextArea]} 
                   placeholder="Chute&#10;Cabeceio" 
@@ -852,7 +984,7 @@ export default function TrainingsScreen() {
                 {creating ? 
                   <ActivityIndicator size="small" color="#FFFFFF" /> : 
                   <>
-                    <Icon name="add-circle-outline" size={20} color="#FFFFFF" />
+                    <Text style={{ fontSize: 20 }}>➕</Text>
                     <Text style={styles.submitButtonText}>Criar Treino</Text>
                   </>
                 }

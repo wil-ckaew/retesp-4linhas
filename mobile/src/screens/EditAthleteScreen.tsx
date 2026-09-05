@@ -1,3 +1,4 @@
+//mobile/src/screens/EditAthleteScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,535 +9,862 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Image,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { API_URL } from '../services/api';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
+import { useTheme } from '../context/ThemeContext';
+import { pickImage, pickPDF } from '../utils/filePicker';
+
+interface Athlete {
+  id: string;
+  name: string;
+  birth_date: string;
+  category: string;
+  avatar_url: string | null;
+  medical_form_url: string | null;
+  phone: string | null;
+  address: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  emergency_contact: string | null;
+  emergency_phone: string | null;
+}
+
+interface FileAsset {
+  uri: string;
+  fileName?: string;
+  fileSize?: number;
+  type?: string;
+  name?: string;
+  size?: number;
+}
+
+// Função para formatar data DD/MM/YYYY
+const formatDate = (text: string) => {
+  const cleaned = text.replace(/\D/g, '');
+  let formatted = cleaned;
+  if (cleaned.length > 2) {
+    formatted = cleaned.slice(0, 2) + '/' + cleaned.slice(2);
+  }
+  if (cleaned.length > 4) {
+    formatted = formatted.slice(0, 5) + '/' + cleaned.slice(4, 8);
+  }
+  return formatted;
+};
+
+// Função para converter YYYY-MM-DD para DD/MM/YYYY
+const convertToDisplayDate = (dateStr: string) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+};
+
+// Função para converter DD/MM/YYYY para YYYY-MM-DD
+const convertToBackendDate = (dateStr: string) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
+};
 
 export default function EditAthleteScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute();
-  const { id } = route.params || { id: '' };
-  
+  const { colors } = useTheme();
+  const { id } = route.params as { id: string };
+
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dateText, setDateText] = useState('');
   const [formData, setFormData] = useState({
     name: '',
-    birth_date: new Date(),
-    category: '',
+    birth_date: '',
+    category: 'Sub-12',
+    phone: '',
+    address: '',
+    neighborhood: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    emergency_contact: '',
+    emergency_phone: '',
   });
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
-  const [medicalFile, setMedicalFile] = useState(null);
-  const [currentAvatarUrl, setCurrentAvatarUrl] = useState(null);
-  const [currentMedicalUrl, setCurrentMedicalUrl] = useState(null);
 
-  const categories = ['Sub-10', 'Sub-12', 'Sub-14', 'Sub-16', 'Sub-18', 'Sub-20'];
+  const [displayDate, setDisplayDate] = useState('');
 
-  const formatDate = (date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
+  const [avatarFile, setAvatarFile] = useState<FileAsset | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  const parseDate = (dateStr) => {
-    const parts = dateStr.split('-');
-    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-  };
+  const [medicalFormFile, setMedicalFormFile] = useState<FileAsset | null>(null);
+  const [medicalFormUrl, setMedicalFormUrl] = useState<string | null>(null);
+  const [currentMedicalFormUrl, setCurrentMedicalFormUrl] = useState<string | null>(null);
+  const [uploadingMedicalForm, setUploadingMedicalForm] = useState(false);
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      padding: 16,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    backButton: {
+      padding: 8,
+      marginRight: 8,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 24,
+      fontWeight: 'bold',
+    },
+    deleteButton: {
+      padding: 8,
+    },
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+    },
+    sectionLabel: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '500',
+      marginBottom: 8,
+    },
+    uploadContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 4,
+    },
+    uploadButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    uploadButtonDisabled: {
+      opacity: 0.5,
+    },
+    uploadButtonText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    uploadButtonGreen: {
+      backgroundColor: '#22c55e',
+    },
+    removeButton: {
+      padding: 8,
+    },
+    avatarPreview: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      overflow: 'hidden',
+    },
+    avatarImage: {
+      width: 48,
+      height: 48,
+      resizeMode: 'cover',
+    },
+    fileInfo: {
+      color: colors.text,
+      fontSize: 14,
+      marginLeft: 4,
+    },
+    helperText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    inputContainer: {
+      marginBottom: 16,
+    },
+    inputLabel: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '500',
+      marginBottom: 8,
+    },
+    inputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+    },
+    input: {
+      flex: 1,
+      color: colors.text,
+      paddingVertical: 12,
+      fontSize: 16,
+    },
+    inputIcon: {
+      marginRight: 8,
+    },
+    picker: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 16,
+    },
+    pickerItem: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 4,
+      marginBottom: 4,
+    },
+    pickerItemActive: {
+      backgroundColor: colors.primary,
+    },
+    pickerItemText: {
+      fontSize: 16,
+    },
+    pickerItemTextActive: {
+      color: '#FFFFFF',
+    },
+    pickerItemTextInactive: {
+      color: colors.text,
+    },
+    submitButton: {
+      backgroundColor: colors.primary,
+      padding: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    submitButtonDisabled: {
+      opacity: 0.5,
+    },
+    submitButtonText: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    divider: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      marginVertical: 16,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+      marginTop: 12,
+    },
+    docLink: {
+      color: colors.primary,
+      fontSize: 14,
+      marginLeft: 8,
+    },
+    dateHelper: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      marginTop: 4,
+      marginLeft: 4,
+    },
+    emojiIcon: { fontSize: 16, width: 24, textAlign: 'center' },
+    emojiIconLarge: { fontSize: 22, width: 32, textAlign: 'center' },
+    emojiIconSmall: { fontSize: 14, width: 20, textAlign: 'center' },
+    emojiButton: { fontSize: 18, marginRight: 4 },
+    row: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    rowHalf: {
+      flex: 1,
+    },
+  });
 
   useEffect(() => {
-    if (id) fetchAthlete();
+    const fetchAthlete = async () => {
+      if (!id) return;
+
+      try {
+        const res = await fetch(`${API_URL}/athletes/${id}`, {
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
+        if (res.ok) {
+          const data: Athlete = await res.json();
+          setFormData({
+            name: data.name,
+            birth_date: data.birth_date,
+            category: data.category,
+            phone: data.phone || '',
+            address: data.address || '',
+            neighborhood: data.neighborhood || '',
+            city: data.city || '',
+            state: data.state || '',
+            zip_code: data.zip_code || '',
+            emergency_contact: data.emergency_contact || '',
+            emergency_phone: data.emergency_phone || '',
+          });
+          setDisplayDate(convertToDisplayDate(data.birth_date));
+          setCurrentAvatarUrl(data.avatar_url);
+          setAvatarUrl(data.avatar_url);
+          setCurrentMedicalFormUrl(data.medical_form_url);
+          setMedicalFormUrl(data.medical_form_url);
+        } else {
+          Alert.alert('❌ Erro', 'Erro ao buscar dados do atleta');
+          navigation.goBack();
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        Alert.alert('❌ Erro', 'Erro de comunicação');
+        navigation.goBack();
+      } finally {
+        setFetching(false);
+      }
+    };
+
+    fetchAthlete();
   }, [id]);
 
-  const fetchAthlete = async () => {
-    try {
-      const response = await fetch(`${API_URL}/athletes/${id}`);
-      const data = await response.json();
-      
-      if (response.ok) {
-        const birthDate = parseDate(data.birth_date);
-        setFormData({
-          name: data.name,
-          birth_date: birthDate,
-          category: data.category,
-        });
-        setDateText(formatDate(birthDate));
-        setCurrentAvatarUrl(data.avatar_url);
-        setCurrentMedicalUrl(data.medical_form_url);
-        if (data.avatar_url) {
-          setAvatarPreview(`${API_URL}${data.avatar_url}`);
-        }
-      } else {
-        Alert.alert('Erro', 'Não foi possível carregar os dados');
-        navigation.goBack();
-      }
-    } catch (error) {
-      console.error('Erro ao buscar atleta:', error);
-      Alert.alert('Erro', 'Erro de conexão');
-      navigation.goBack();
-    } finally {
-      setFetching(false);
-    }
+  const handleChange = (field: string, value: string) => {
+    setFormData({ ...formData, [field]: value });
   };
 
-  const pickImage = async () => {
+  const handleDateChange = (text: string) => {
+    const formatted = formatDate(text);
+    setDisplayDate(formatted);
+    const backendDate = convertToBackendDate(formatted);
+    setFormData({ ...formData, birth_date: backendDate });
+  };
+
+  const handleAvatarUpload = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permissão necessária', 'Precisamos de acesso à sua galeria.');
+      const result: any = await pickImage();
+      
+      if (result.didCancel) return;
+
+      const asset = result.assets?.[0];
+      if (!asset) return;
+
+      if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+        Alert.alert('❌ Erro', 'A foto deve ter no máximo 5MB');
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
+      setAvatarFile(asset);
+      setUploadingAvatar(true);
 
-      if (!result.canceled) {
-        const asset = result.assets[0];
-        setAvatarFile({
+      const formDataUpload = new FormData();
+      
+      if (Platform.OS === 'web') {
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        formDataUpload.append('file', blob, asset.fileName || 'avatar.jpg');
+      } else {
+        formDataUpload.append('file', {
           uri: asset.uri,
           type: asset.type || 'image/jpeg',
-          name: asset.fileName || `avatar_${Date.now()}.jpg`,
+          name: asset.fileName || 'avatar.jpg',
+        } as any);
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/upload`, {
+          method: 'POST',
+          body: formDataUpload,
         });
-        setAvatarPreview(asset.uri);
-        Alert.alert('Sucesso', 'Foto selecionada!');
+
+        if (res.ok) {
+          const data = await res.json();
+          setAvatarUrl(data.url);
+          Alert.alert('✅ Sucesso', 'Foto atualizada com sucesso!');
+        } else {
+          Alert.alert('❌ Erro', 'Erro ao fazer upload da foto');
+          setAvatarFile(null);
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        Alert.alert('❌ Erro', 'Erro de comunicação ao enviar a foto');
+        setAvatarFile(null);
+      } finally {
+        setUploadingAvatar(false);
       }
     } catch (error) {
-      console.error('Erro:', error);
-      Alert.alert('Erro', 'Não foi possível selecionar a imagem');
+      console.error('Erro ao selecionar imagem:', error);
+      Alert.alert('❌ Erro', 'Erro ao selecionar imagem');
     }
   };
 
-  const removeImage = () => {
-    setAvatarFile(null);
-    setAvatarPreview(null);
-    setCurrentAvatarUrl(null);
-  };
-
-  const pickPDF = async () => {
+  const handleMedicalFormUpload = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true,
-      });
+      const result: any = await pickPDF();
+      
+      const file = result[0];
+      if (!file) return;
 
-      if (result.type === 'success') {
-        setMedicalFile({
-          uri: result.uri,
-          type: result.mimeType || 'application/pdf',
-          name: result.name || `medical_${Date.now()}.pdf`,
-        });
-        Alert.alert('Sucesso', 'PDF selecionado!');
+      if (file.size && file.size > 10 * 1024 * 1024) {
+        Alert.alert('❌ Erro', 'O arquivo PDF deve ter no máximo 10MB');
+        return;
       }
-    } catch (error) {
-      console.error('Erro PDF:', error);
-      Alert.alert('Erro', 'Não foi possível selecionar o PDF');
-    }
-  };
 
-  const removePDF = () => {
-    setMedicalFile(null);
-    setCurrentMedicalUrl(null);
-  };
+      setMedicalFormFile(file);
+      setUploadingMedicalForm(true);
 
-  const uploadFile = async (file) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', {
-        uri: file.uri,
-        type: file.type,
-        name: file.name,
-      });
-
-      const response = await fetch(`${API_URL}/upload`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      if (response.ok && data.url) {
-        return data.url;
+      const formDataUpload = new FormData();
+      
+      if (Platform.OS === 'web') {
+        const response = await fetch(file.uri);
+        const blob = await response.blob();
+        formDataUpload.append('file', blob, file.name || 'medical_form.pdf');
       } else {
-        throw new Error(data.error || 'Erro no upload');
+        formDataUpload.append('file', {
+          uri: file.uri,
+          type: file.type || 'application/pdf',
+          name: file.name || 'medical_form.pdf',
+        } as any);
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/upload`, {
+          method: 'POST',
+          body: formDataUpload,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setMedicalFormUrl(data.url);
+          Alert.alert('✅ Sucesso', 'Ficha médica atualizada com sucesso!');
+        } else {
+          Alert.alert('❌ Erro', 'Erro ao fazer upload da ficha');
+          setMedicalFormFile(null);
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        Alert.alert('❌ Erro', 'Erro de comunicação ao enviar a ficha');
+        setMedicalFormFile(null);
+      } finally {
+        setUploadingMedicalForm(false);
       }
     } catch (error) {
-      console.error('Upload error:', error);
-      throw error;
+      console.error('Erro ao selecionar PDF:', error);
+      Alert.alert('❌ Erro', 'Erro ao selecionar o arquivo PDF');
     }
   };
 
-  const handleUpdateAthlete = async () => {
-    console.log('🔄 ATUALIZANDO ATLETA');
+  const removeAvatar = () => {
+    setAvatarFile(null);
+    setAvatarUrl(null);
+  };
 
+  const removeMedicalForm = () => {
+    setMedicalFormFile(null);
+    setMedicalFormUrl(null);
+  };
+
+  const handleDelete = async () => {
+    Alert.alert(
+      '⚠️ Confirmar exclusão',
+      'Tem certeza que deseja excluir este atleta?',
+      [
+        { text: '❌ Cancelar', style: 'cancel' },
+        {
+          text: '🗑️ Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await fetch(`${API_URL}/athletes/${id}`, {
+                method: 'DELETE',
+              });
+              if (res.ok) {
+                Alert.alert('✅ Sucesso', 'Atleta excluído com sucesso!');
+                navigation.reset({
+                  index: 0,
+                  routes: [
+                    {
+                      name: 'Main',
+                      state: {
+                        index: 0,
+                        routes: [{ name: 'Atletas' }],
+                      },
+                    },
+                  ],
+                });
+              } else {
+                Alert.alert('❌ Erro', 'Erro ao excluir atleta');
+              }
+            } catch (error) {
+              console.error('Erro:', error);
+              Alert.alert('❌ Erro', 'Erro de comunicação');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      Alert.alert('Erro', 'Digite o nome do atleta');
+      Alert.alert('❌ Erro', 'Nome do atleta é obrigatório');
       return;
     }
-    if (!formData.category) {
-      Alert.alert('Erro', 'Selecione uma categoria');
+    if (!formData.birth_date) {
+      Alert.alert('❌ Erro', 'Data de nascimento é obrigatória');
       return;
     }
 
     setLoading(true);
     try {
-      let uploadedAvatarUrl = currentAvatarUrl;
-      let uploadedMedicalUrl = currentMedicalUrl;
-
-      if (avatarFile) {
-        try {
-          uploadedAvatarUrl = await uploadFile(avatarFile);
-          console.log('✅ Nova foto enviada:', uploadedAvatarUrl);
-        } catch (error) {
-          console.error('Erro upload foto:', error);
-        }
-      }
-
-      if (medicalFile) {
-        try {
-          uploadedMedicalUrl = await uploadFile(medicalFile);
-          console.log('✅ Novo PDF enviado:', uploadedMedicalUrl);
-        } catch (error) {
-          console.error('Erro upload PDF:', error);
-        }
-      }
-
-      const birthDateStr = formData.birth_date.toISOString().split('T')[0];
-      const athleteData = {
-        name: formData.name.trim(),
-        birth_date: birthDateStr,
+      const payload = {
+        name: formData.name,
+        birth_date: formData.birth_date,
         category: formData.category,
-        avatar_url: uploadedAvatarUrl,
-        medical_form_url: uploadedMedicalUrl,
+        avatar_url: avatarUrl,
+        medical_form_url: medicalFormUrl,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        neighborhood: formData.neighborhood || null,
+        city: formData.city || null,
+        state: formData.state || null,
+        zip_code: formData.zip_code || null,
+        emergency_contact: formData.emergency_contact || null,
+        emergency_phone: formData.emergency_phone || null,
       };
 
-      console.log('📦 Enviando:', JSON.stringify(athleteData));
-
-      const response = await fetch(`${API_URL}/athletes/${id}`, {
+      const res = await fetch(`${API_URL}/athletes/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(athleteData),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-      console.log('📥 Resposta:', data);
-
-      setLoading(false);
-
-      setTimeout(() => {
-        Alert.alert(
-          '✅ Sucesso!',
-          `Atleta ${formData.name} atualizado!`,
-          [
+      if (res.ok) {
+        Alert.alert('✅ Sucesso', 'Atleta atualizado com sucesso!');
+        navigation.reset({
+          index: 0,
+          routes: [
             {
-              text: 'OK',
-              onPress: () => {
-                navigation.dispatch(
-                  CommonActions.reset({
-                    index: 0,
-                    routes: [{ name: 'AthletesList' }],
-                  })
-                );
+              name: 'Main',
+              state: {
+                index: 0,
+                routes: [{ name: 'Atletas' }],
               },
             },
           ],
-          { cancelable: false }
-        );
-      }, 300);
-
+        });
+      } else {
+        const err = await res.text();
+        Alert.alert('❌ Erro', `Erro: ${err}`);
+      }
     } catch (error) {
-      console.error('❌ Erro:', error);
+      console.error('Erro:', error);
+      Alert.alert('❌ Erro', 'Erro de comunicação com o servidor');
+    } finally {
       setLoading(false);
-      Alert.alert('Erro', 'Erro de conexão com o servidor');
-    }
-  };
-
-  const onDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setFormData(prev => ({ ...prev, birth_date: selectedDate }));
-      setDateText(formatDate(selectedDate));
     }
   };
 
   if (fetching) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={styles.loadingText}>Carregando...</Text>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>⏳ Carregando dados do atleta...</Text>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Icon name="arrow-back" size={24} color="#FFFFFF" />
+            <Icon name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Editar Atleta</Text>
-          <View style={styles.headerPlaceholder} />
+          <Text style={styles.title}>✏️ Editar Atleta</Text>
         </View>
+        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+          <Text style={{ fontSize: 24 }}>🗑️</Text>
+        </TouchableOpacity>
+      </View>
 
-        <View style={styles.formCard}>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Nome do Atleta *</Text>
+      <View style={styles.card}>
+        <Text style={styles.sectionLabel}>📸 Foto do Atleta</Text>
+        <View style={styles.uploadContainer}>
+          {(currentAvatarUrl || avatarUrl) && !avatarFile && (
+            <View style={styles.avatarPreview}>
+              <Image source={{ uri: `${API_URL}${avatarUrl || currentAvatarUrl}` }} style={styles.avatarImage} />
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.uploadButton, (uploadingAvatar || avatarFile) && styles.uploadButtonDisabled]}
+            onPress={handleAvatarUpload}
+            disabled={uploadingAvatar || !!avatarFile}
+          >
+            <Text style={styles.emojiButton}>{avatarFile ? '📷' : '☁️'}</Text>
+            <Text style={styles.uploadButtonText}>
+              {uploadingAvatar ? '⏳ Enviando...' : avatarFile ? '📸 Foto Selecionada' : currentAvatarUrl ? '🔄 Trocar Foto' : '📎 Anexar Foto'}
+            </Text>
+          </TouchableOpacity>
+
+          {(avatarFile || currentAvatarUrl) && (
+            <TouchableOpacity style={styles.removeButton} onPress={removeAvatar}>
+              <Text style={{ fontSize: 24 }}>❌</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <Text style={styles.helperText}>Aceita imagens JPG, PNG, GIF (máx 5MB)</Text>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>👤 Nome completo</Text>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.emojiIcon}>👤</Text>
             <TextInput
               style={styles.input}
-              placeholder="Digite o nome completo"
-              placeholderTextColor="#6B7280"
+              placeholder="Digite o nome do atleta"
+              placeholderTextColor={colors.textSecondary}
               value={formData.name}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+              onChangeText={(value) => handleChange('name', value)}
             />
           </View>
+        </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Data de Nascimento *</Text>
-            <View style={styles.dateContainer}>
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>📅 Data de nascimento</Text>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.emojiIcon}>📅</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="DD/MM/AAAA"
+              placeholderTextColor={colors.textSecondary}
+              value={displayDate}
+              onChangeText={handleDateChange}
+              keyboardType="numeric"
+              maxLength={10}
+            />
+          </View>
+          <Text style={styles.dateHelper}>Digite no formato: dia/mês/ano (ex: 15/03/2000)</Text>
+        </View>
+
+        <Text style={styles.inputLabel}>🏷️ Categoria / Turma</Text>
+        <View style={styles.picker}>
+          {['Sub-10', 'Sub-12', 'Sub-14', 'Sub-16', 'Sub-18'].map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[
+                styles.pickerItem,
+                formData.category === cat && styles.pickerItemActive,
+              ]}
+              onPress={() => handleChange('category', cat)}
+            >
+              <Text
+                style={[
+                  styles.pickerItemText,
+                  formData.category === cat ? styles.pickerItemTextActive : styles.pickerItemTextInactive,
+                ]}
+              >
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* NOVOS CAMPOS */}
+        <View style={styles.divider} />
+        
+        <Text style={styles.inputLabel}>📞 Telefone</Text>
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.emojiIcon}>📞</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="(00) 00000-0000"
+              placeholderTextColor={colors.textSecondary}
+              value={formData.phone}
+              onChangeText={(value) => handleChange('phone', value)}
+              keyboardType="phone-pad"
+            />
+          </View>
+        </View>
+
+        <Text style={styles.inputLabel}>📍 Endereço</Text>
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.emojiIcon}>📍</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 60, textAlignVertical: 'top' }]}
+              placeholder="Rua, número, complemento"
+              placeholderTextColor={colors.textSecondary}
+              value={formData.address}
+              onChangeText={(value) => handleChange('address', value)}
+              multiline
+              numberOfLines={2}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.inputLabel}>🏘️ Bairro</Text>
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.emojiIcon}>🏘️</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Bairro"
+              placeholderTextColor={colors.textSecondary}
+              value={formData.neighborhood}
+              onChangeText={(value) => handleChange('neighborhood', value)}
+            />
+          </View>
+        </View>
+
+        <View style={styles.row}>
+          <View style={[styles.rowHalf, styles.inputContainer]}>
+            <Text style={styles.inputLabel}>🏙️ Cidade</Text>
+            <View style={styles.inputWrapper}>
+              <Text style={styles.emojiIcon}>🏙️</Text>
               <TextInput
-                style={[styles.input, styles.dateInputText]}
-                placeholder="DD/MM/AAAA"
-                placeholderTextColor="#6B7280"
-                value={dateText}
-                onChangeText={(text) => {
-                  let cleaned = text.replace(/\D/g, '');
-                  if (cleaned.length <= 2) {
-                    setDateText(cleaned);
-                  } else if (cleaned.length <= 4) {
-                    setDateText(cleaned.slice(0, 2) + '/' + cleaned.slice(2));
-                  } else if (cleaned.length <= 8) {
-                    setDateText(cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4) + '/' + cleaned.slice(4, 8));
-                  } else {
-                    setDateText(cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4) + '/' + cleaned.slice(4, 8));
-                  }
-                  
-                  if (cleaned.length >= 8) {
-                    const day = parseInt(cleaned.slice(0, 2));
-                    const month = parseInt(cleaned.slice(2, 4)) - 1;
-                    const year = parseInt(cleaned.slice(4, 8));
-                    if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900) {
-                      const newDate = new Date(year, month, day);
-                      if (!isNaN(newDate.getTime())) {
-                        setFormData(prev => ({ ...prev, birth_date: newDate }));
-                      }
-                    }
-                  }
-                }}
-                keyboardType="numeric"
-                maxLength={10}
+                style={styles.input}
+                placeholder="Cidade"
+                placeholderTextColor={colors.textSecondary}
+                value={formData.city}
+                onChangeText={(value) => handleChange('city', value)}
               />
-              <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePicker(true)}>
-                <Icon name="calendar" size={24} color="#3B82F6" />
-              </TouchableOpacity>
             </View>
-            {showDatePicker && (
-              <DateTimePicker
-                value={formData.birth_date}
-                mode="date"
-                display="default"
-                onChange={onDateChange}
-                maximumDate={new Date()}
-              />
-            )}
           </View>
+          <View style={[styles.rowHalf, styles.inputContainer]}>
+            <Text style={styles.inputLabel}>📮 UF</Text>
+            <View style={styles.inputWrapper}>
+              <Text style={styles.emojiIcon}>📮</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="SP"
+                placeholderTextColor={colors.textSecondary}
+                value={formData.state}
+                onChangeText={(value) => handleChange('state', value)}
+                maxLength={2}
+                autoCapitalize="characters"
+              />
+            </View>
+          </View>
+        </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Categoria *</Text>
-            <Text style={[styles.helperText, { color: formData.category ? '#10B981' : '#6B7280' }]}>
-              {formData.category ? `✅ ${formData.category}` : '⚠️ Selecione uma categoria'}
+        <Text style={styles.inputLabel}>📮 CEP</Text>
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.emojiIcon}>📮</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="00000-000"
+              placeholderTextColor={colors.textSecondary}
+              value={formData.zip_code}
+              onChangeText={(value) => handleChange('zip_code', value)}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+
+        <View style={styles.divider} />
+        
+        <Text style={styles.inputLabel}>🆘 Contato de Emergência</Text>
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.emojiIcon}>🆘</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nome do contato de emergência"
+              placeholderTextColor={colors.textSecondary}
+              value={formData.emergency_contact}
+              onChangeText={(value) => handleChange('emergency_contact', value)}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.inputLabel}>📞 Telefone de Emergência</Text>
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.emojiIcon}>📞</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="(00) 00000-0000"
+              placeholderTextColor={colors.textSecondary}
+              value={formData.emergency_phone}
+              onChangeText={(value) => handleChange('emergency_phone', value)}
+              keyboardType="phone-pad"
+            />
+          </View>
+        </View>
+
+        <View style={styles.divider} />
+        
+        <Text style={styles.sectionLabel}>📄 Ficha do Atleta (3 páginas)</Text>
+        <View style={styles.uploadContainer}>
+          {currentMedicalFormUrl && !medicalFormFile && (
+            <Text style={styles.docLink}>📄 PDF Atual</Text>
+          )}
+
+          <TouchableOpacity
+            style={[styles.uploadButton, styles.uploadButtonGreen, (uploadingMedicalForm || medicalFormFile) && styles.uploadButtonDisabled]}
+            onPress={handleMedicalFormUpload}
+            disabled={uploadingMedicalForm || !!medicalFormFile}
+          >
+            <Text style={styles.emojiButton}>📄</Text>
+            <Text style={styles.uploadButtonText}>
+              {uploadingMedicalForm ? '⏳ Enviando...' : medicalFormFile ? '📄 PDF Selecionado' : currentMedicalFormUrl ? '🔄 Trocar Ficha' : '📎 Anexar Ficha PDF'}
             </Text>
-            <View style={styles.categoriesGrid}>
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.categoryButton,
-                    formData.category === category && styles.categoryButtonActive,
-                  ]}
-                  onPress={() => setFormData(prev => ({ ...prev, category }))}
-                >
-                  <Text style={[styles.categoryText, formData.category === category && styles.categoryTextActive]}>
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Foto do Atleta</Text>
-            {avatarPreview || currentAvatarUrl ? (
-              <View style={styles.fileContainer}>
-                <Image source={{ uri: avatarPreview || `${API_URL}${currentAvatarUrl}` }} style={styles.previewImage} />
-                <View style={styles.fileInfo}>
-                  <Text style={styles.fileName}>{avatarFile ? avatarFile.name : 'Foto atual'}</Text>
-                  <TouchableOpacity onPress={pickImage}>
-                    <Text style={styles.changeButtonText}>Trocar foto</Text>
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity onPress={removeImage}>
-                  <Icon name="close-circle" size={24} color="#EF4444" />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-                <Icon name="cloud-upload" size={32} color="#3B82F6" />
-                <Text style={styles.uploadText}>Selecionar foto</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Ficha Médica (PDF)</Text>
-            {(medicalFile || currentMedicalUrl) ? (
-              <View style={styles.fileContainer}>
-                <Icon name="document-text" size={32} color="#10B981" />
-                <View style={styles.fileInfo}>
-                  <Text style={styles.fileName}>{medicalFile ? medicalFile.name : 'PDF atual'}</Text>
-                  <TouchableOpacity onPress={pickPDF}>
-                    <Text style={styles.changeButtonText}>Trocar PDF</Text>
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity onPress={removePDF}>
-                  <Icon name="close-circle" size={24} color="#EF4444" />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.uploadButton} onPress={pickPDF}>
-                <Icon name="document-text" size={32} color="#10B981" />
-                <Text style={styles.uploadText}>Selecionar PDF</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity style={[styles.button, styles.buttonCancel]} onPress={() => navigation.goBack()}>
-            <Text style={styles.buttonCancelText}>Cancelar</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.buttonCreate]} onPress={handleUpdateAthlete} disabled={loading}>
-            {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : (
-              <>
-                <Icon name="save" size={20} color="#FFFFFF" />
-                <Text style={styles.buttonCreateText}>Atualizar</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>* Campos obrigatórios</Text>
+          {(medicalFormFile || currentMedicalFormUrl) && (
+            <TouchableOpacity style={styles.removeButton} onPress={removeMedicalForm}>
+              <Text style={{ fontSize: 24 }}>❌</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <Text style={styles.helperText}>Aceita apenas arquivos PDF (máx 10MB)</Text>
+
+        <TouchableOpacity
+          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.submitButtonText}>💾 Atualizar Atleta</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1117' },
-  scrollContent: { paddingBottom: 40 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    backgroundColor: '#0D1117',
-  },
-  backButton: { padding: 8 },
-  headerTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' },
-  headerPlaceholder: { width: 40 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1117' },
-  loadingText: { color: '#6B7280', marginTop: 12 },
-  formCard: { margin: 16, padding: 20, backgroundColor: '#161B22', borderRadius: 16, borderWidth: 1, borderColor: '#30363D' },
-  formGroup: { marginBottom: 20 },
-  label: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', marginBottom: 8 },
-  helperText: { fontSize: 12, marginBottom: 8 },
-  input: {
-    backgroundColor: '#0D1117',
-    borderWidth: 1,
-    borderColor: '#30363D',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
-  dateContainer: { flexDirection: 'row', gap: 8 },
-  dateInputText: { flex: 1 },
-  datePickerButton: {
-    backgroundColor: '#0D1117',
-    borderWidth: 1,
-    borderColor: '#30363D',
-    borderRadius: 12,
-    padding: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  categoriesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  categoryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#21262D',
-    borderWidth: 1,
-    borderColor: '#30363D',
-    minWidth: 70,
-    alignItems: 'center',
-  },
-  categoryButtonActive: { backgroundColor: '#3B82F6', borderColor: '#3B82F6' },
-  categoryText: { color: '#6B7280', fontSize: 13, fontWeight: '500' },
-  categoryTextActive: { color: '#FFFFFF' },
-  uploadButton: {
-    backgroundColor: '#0D1117',
-    borderWidth: 2,
-    borderColor: '#30363D',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 70,
-  },
-  uploadText: { color: '#FFFFFF', fontSize: 14, marginTop: 4, fontWeight: '500' },
-  fileContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0D1117',
-    borderWidth: 1,
-    borderColor: '#30363D',
-    borderRadius: 12,
-    padding: 12,
-    gap: 12,
-  },
-  previewImage: { width: 50, height: 50, borderRadius: 8, resizeMode: 'cover' },
-  fileInfo: { flex: 1 },
-  fileName: { color: '#FFFFFF', fontSize: 14 },
-  changeButtonText: { color: '#3B82F6', fontSize: 12, marginTop: 4 },
-  actionsContainer: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginTop: 8 },
-  button: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, gap: 8 },
-  buttonCancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#30363D' },
-  buttonCancelText: { color: '#6B7280', fontSize: 16, fontWeight: '600' },
-  buttonCreate: { backgroundColor: '#3B82F6' },
-  buttonCreateText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  footer: { paddingHorizontal: 16, marginTop: 12, alignItems: 'center' },
-  footerText: { color: '#6B7280', fontSize: 12 },
-});

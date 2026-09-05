@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { API_URL } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert, Platform } from 'react-native';
 
 interface Story {
   id: number;
@@ -24,14 +25,39 @@ interface StatusContextData {
 
 const StatusContext = createContext<StatusContextData>({} as StatusContextData);
 
-export const useStatus = () => useContext(StatusContext);
+export const useStatus = () => {
+  const context = useContext(StatusContext);
+  if (!context) {
+    throw new Error('useStatus must be used within a StatusProvider');
+  }
+  return context;
+};
 
 interface StatusProviderProps {
   children: ReactNode;
 }
 
+// Stories padrão para teste
+const DEFAULT_STORIES: Story[] = [
+  {
+    id: 1,
+    user: 'RETESP 4L',
+    type: 'image',
+    isFromRETESP: true,
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+  },
+  {
+    id: 2,
+    user: 'João Silva',
+    type: 'image',
+    image: 'https://via.placeholder.com/150',
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+  },
+];
+
 export const StatusProvider: React.FC<StatusProviderProps> = ({ children }) => {
   const [stories, setStories] = useState<Story[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Carregar stories salvos localmente
   const loadLocalStories = async () => {
@@ -39,10 +65,15 @@ export const StatusProvider: React.FC<StatusProviderProps> = ({ children }) => {
       const saved = await AsyncStorage.getItem('@stories');
       if (saved) {
         const parsed = JSON.parse(saved);
-        setStories(parsed);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setStories(parsed);
+          return true;
+        }
       }
+      return false;
     } catch (error) {
       console.error('Erro ao carregar stories locais:', error);
+      return false;
     }
   };
 
@@ -58,9 +89,13 @@ export const StatusProvider: React.FC<StatusProviderProps> = ({ children }) => {
   // Buscar stories do backend
   const fetchStories = async () => {
     try {
+      console.log('Buscando stories do backend...');
       const res = await fetch(`${API_URL}/social/stories?_t=${Date.now()}`);
+      
       if (res.ok) {
         const data = await res.json();
+        console.log('Stories recebidos:', data);
+        
         if (Array.isArray(data) && data.length > 0) {
           const backendStories: Story[] = data.map((item: any) => ({
             id: item.id || Date.now() + Math.random(),
@@ -80,11 +115,21 @@ export const StatusProvider: React.FC<StatusProviderProps> = ({ children }) => {
             saveLocalStories(allStories);
             return allStories;
           });
+          return;
         }
+      } else {
+        console.log('Erro ao buscar stories:', res.status);
       }
     } catch (error) {
       console.error('Erro ao buscar stories:', error);
-      await loadLocalStories();
+    }
+    
+    // Se falhar, carregar do local ou usar defaults
+    const hasLocal = await loadLocalStories();
+    if (!hasLocal) {
+      console.log('Usando stories padrão');
+      setStories(DEFAULT_STORIES);
+      saveLocalStories(DEFAULT_STORIES);
     }
   };
 
@@ -97,6 +142,7 @@ export const StatusProvider: React.FC<StatusProviderProps> = ({ children }) => {
     };
 
     try {
+      console.log('Adicionando story ao backend...');
       const res = await fetch(`${API_URL}/social/stories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,6 +158,7 @@ export const StatusProvider: React.FC<StatusProviderProps> = ({ children }) => {
       
       if (res.ok) {
         const data = await res.json();
+        console.log('Story adicionado com sucesso:', data);
         const updatedStory = { 
           ...storyWithExpiry, 
           id: data.id || storyWithExpiry.id,
@@ -119,12 +166,15 @@ export const StatusProvider: React.FC<StatusProviderProps> = ({ children }) => {
         };
         addStory(updatedStory);
         return;
+      } else {
+        console.log('Erro ao adicionar story:', res.status);
       }
     } catch (error) {
       console.error('Erro ao salvar story no backend:', error);
     }
     
     // Se falhar, salvar localmente
+    console.log('Salvando story localmente');
     addStory(storyWithExpiry);
   };
 
@@ -148,7 +198,9 @@ export const StatusProvider: React.FC<StatusProviderProps> = ({ children }) => {
     const now = Date.now();
     setStories(prev => {
       const filtered = prev.filter(s => !s.expiresAt || s.expiresAt > now);
-      saveLocalStories(filtered);
+      if (filtered.length !== prev.length) {
+        saveLocalStories(filtered);
+      }
       return filtered;
     });
   };
@@ -160,8 +212,12 @@ export const StatusProvider: React.FC<StatusProviderProps> = ({ children }) => {
 
   // Carregar stories ao iniciar
   useEffect(() => {
-    loadLocalStories();
-    fetchStories();
+    const init = async () => {
+      setIsLoading(true);
+      await fetchStories();
+      setIsLoading(false);
+    };
+    init();
     
     const interval = setInterval(deleteExpiredStories, 60000);
     return () => clearInterval(interval);

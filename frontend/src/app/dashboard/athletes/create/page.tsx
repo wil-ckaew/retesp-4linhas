@@ -1,7 +1,8 @@
+// frontend/src/app/dashboard/athletes/create/page.tsx
 "use client";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Upload, X, FileText, Camera, User } from "lucide-react";
+import { ArrowLeft, Upload, X, FileText, Camera, Phone, MapPin, Home, Building, AlertTriangle } from "lucide-react";
 
 export default function CreateAthletePage() {
   const router = useRouter();
@@ -10,6 +11,15 @@ export default function CreateAthletePage() {
     name: "",
     birth_date: "",
     category: "Sub-12",
+    // NOVOS CAMPOS
+    phone: "",
+    address: "",
+    neighborhood: "",
+    city: "",
+    state: "",
+    zip_code: "",
+    emergency_contact: "",
+    emergency_phone: "",
   });
   
   // Estado para a foto do atleta
@@ -24,7 +34,7 @@ export default function CreateAthletePage() {
   const [uploadingMedicalForm, setUploadingMedicalForm] = useState(false);
   const medicalInputRef = useRef<HTMLInputElement>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -33,13 +43,11 @@ export default function CreateAthletePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Verifica se é imagem
     if (!file.type.startsWith("image/")) {
       alert("Apenas arquivos de imagem são permitidos para a foto.");
       return;
     }
 
-    // Verifica tamanho (máx 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert("A foto deve ter no máximo 5MB.");
       return;
@@ -151,7 +159,18 @@ export default function CreateAthletePage() {
         category: formData.category,
         avatar_url: avatarUrl,
         medical_form_url: medicalFormUrl,
+        // NOVOS CAMPOS
+        phone: formData.phone || null,
+        address: formData.address || null,
+        neighborhood: formData.neighborhood || null,
+        city: formData.city || null,
+        state: formData.state || null,
+        zip_code: formData.zip_code || null,
+        emergency_contact: formData.emergency_contact || null,
+        emergency_phone: formData.emergency_phone || null,
       };
+
+      console.log("📤 Enviando dados:", payload);
 
       const res = await fetch("http://localhost:8081/athletes", {
         method: "POST",
@@ -254,7 +273,7 @@ export default function CreateAthletePage() {
 
         {/* Nome */}
         <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">Nome completo</label>
+          <label className="block text-sm font-medium text-gray-400 mb-1">👤 Nome completo *</label>
           <input
             type="text"
             name="name"
@@ -268,7 +287,7 @@ export default function CreateAthletePage() {
 
         {/* Data de Nascimento */}
         <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">Data de nascimento</label>
+          <label className="block text-sm font-medium text-gray-400 mb-1">📅 Data de nascimento *</label>
           <input
             type="date"
             name="birth_date"
@@ -281,7 +300,7 @@ export default function CreateAthletePage() {
 
         {/* Categoria */}
         <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">Categoria / Turma</label>
+          <label className="block text-sm font-medium text-gray-400 mb-1">🏷️ Categoria / Turma *</label>
           <select
             name="category"
             value={formData.category}
@@ -293,7 +312,135 @@ export default function CreateAthletePage() {
             <option value="Sub-14">Sub-14</option>
             <option value="Sub-16">Sub-16</option>
             <option value="Sub-18">Sub-18</option>
+            <option value="Sub-20">Sub-20</option>
           </select>
+        </div>
+
+        {/* Linha divisória */}
+        <div className="border-t border-[#30363D] pt-4 mt-2">
+          <h3 className="text-sm font-medium text-gray-400 mb-3">📞 Contato & Endereço</h3>
+
+          {/* Telefone */}
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-1">
+              <Phone size={14} /> Telefone
+            </label>
+            <input
+              type="text"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              placeholder="(00) 00000-0000"
+            />
+          </div>
+
+          {/* Endereço */}
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-1">
+              <MapPin size={14} /> Endereço
+            </label>
+            <textarea
+              name="address"
+              value={formData.address}
+              onChange={handleChange}
+              className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+              placeholder="Rua, número, complemento"
+              rows={2}
+            />
+          </div>
+
+          {/* Bairro */}
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-1">
+              <Home size={14} /> Bairro
+            </label>
+            <input
+              type="text"
+              name="neighborhood"
+              value={formData.neighborhood}
+              onChange={handleChange}
+              className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              placeholder="Bairro"
+            />
+          </div>
+
+          {/* Cidade e Estado */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-1">
+                <Building size={14} /> Cidade
+              </label>
+              <input
+                type="text"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                placeholder="Cidade"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">UF</label>
+              <input
+                type="text"
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 uppercase"
+                placeholder="SP"
+                maxLength={2}
+              />
+            </div>
+          </div>
+
+          {/* CEP */}
+          <div className="mt-3">
+            <label className="block text-sm font-medium text-gray-400 mb-1">📮 CEP</label>
+            <input
+              type="text"
+              name="zip_code"
+              value={formData.zip_code}
+              onChange={handleChange}
+              className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              placeholder="00000-000"
+            />
+          </div>
+        </div>
+
+        {/* Linha divisória - Emergência */}
+        <div className="border-t border-[#30363D] pt-4 mt-2">
+          <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-1">
+            <AlertTriangle size={14} /> Contato de Emergência
+          </h3>
+
+          {/* Contato de Emergência */}
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-400 mb-1">🆘 Nome do Contato</label>
+            <input
+              type="text"
+              name="emergency_contact"
+              value={formData.emergency_contact}
+              onChange={handleChange}
+              className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              placeholder="Nome do contato de emergência"
+            />
+          </div>
+
+          {/* Telefone de Emergência */}
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-1">
+              <Phone size={14} /> Telefone de Emergência
+            </label>
+            <input
+              type="text"
+              name="emergency_phone"
+              value={formData.emergency_phone}
+              onChange={handleChange}
+              className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              placeholder="(00) 00000-0000"
+            />
+          </div>
         </div>
 
         {/* Ficha Médica PDF */}

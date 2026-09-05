@@ -1,9 +1,9 @@
-// frontend/src/app/dashboard/athletes/pages.tsx
+// frontend/src/app/dashboard/athletes/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Pencil, Trash2, Eye, FileText, Calendar, Users, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, FileText, Calendar, Users, ChevronDown, ChevronUp, Download, Phone, MapPin, Home, Building, Mail, AlertTriangle } from "lucide-react";
 
 type Athlete = {
   id: string;
@@ -12,6 +12,15 @@ type Athlete = {
   category: string;
   avatar_url: string | null;
   medical_form_url: string | null;
+  // NOVOS CAMPOS
+  phone?: string | null;
+  address?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+  emergency_contact?: string | null;
+  emergency_phone?: string | null;
 };
 
 function ClockIcon(props: any) {
@@ -95,12 +104,25 @@ export default function AthletesPage() {
     return `http://localhost:8081${avatarUrl}`;
   };
 
+  const formatPhone = (phone: string | null | undefined) => {
+    if (!phone) return "Não informado";
+    return phone;
+  };
+
+  const formatAddress = (athlete: Athlete) => {
+    const parts = [];
+    if (athlete.address) parts.push(athlete.address);
+    if (athlete.neighborhood) parts.push(athlete.neighborhood);
+    if (athlete.city) parts.push(athlete.city);
+    if (athlete.state) parts.push(athlete.state);
+    return parts.length > 0 ? parts.join(", ") : "Não informado";
+  };
+
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      {/* Cabeçalho melhorado com logo maior */}
+      {/* Cabeçalho */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          {/* Logo maior e mais destacada */}
           <div className="w-16 h-16 rounded-2xl overflow-hidden bg-[#161B22] border-2 border-[#30363D] flex items-center justify-center shadow-lg hover:shadow-blue-500/20 transition-shadow duration-300">
             <Image 
               src="/images/logo.jpeg" 
@@ -149,7 +171,6 @@ export default function AthletesPage() {
           ) : (
             athletes.map((athlete) => {
               const imageUrl = getImageUrl(athlete.avatar_url);
-              console.log(`URL da imagem para ${athlete.name}:`, imageUrl);
               
               return (
                 <div
@@ -192,8 +213,14 @@ export default function AthletesPage() {
                             <ClockIcon size={14} />
                             {calculateAge(athlete.birth_date)} anos
                           </span>
-                          {athlete.medical_form_url && (
+                          {athlete.phone && (
                             <span className="flex items-center gap-1 text-green-400">
+                              <Phone size={14} />
+                              {formatPhone(athlete.phone)}
+                            </span>
+                          )}
+                          {athlete.medical_form_url && (
+                            <span className="flex items-center gap-1 text-purple-400">
                               <FileText size={14} />
                               Ficha Médica
                             </span>
@@ -248,6 +275,7 @@ export default function AthletesPage() {
                   {expandedId === athlete.id && (
                     <div className="border-t border-[#30363D] p-6 bg-[#0D1117]/50">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Coluna 1 - Informações Pessoais */}
                         <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-4">
                           <h3 className="text-sm font-medium text-gray-400 mb-3">📋 Informações Pessoais</h3>
                           <div className="space-y-2">
@@ -274,78 +302,140 @@ export default function AthletesPage() {
                           </div>
                         </div>
 
+                        {/* Coluna 2 - Contato e Endereço (NOVOS CAMPOS) */}
                         <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-4">
-                          <h3 className="text-sm font-medium text-gray-400 mb-3">📄 Documentos</h3>
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <FileText size={16} className="text-green-400" />
-                                <span className="text-sm">Ficha Médica</span>
-                              </div>
-                              {athlete.medical_form_url ? (
-                                <a
-                                  href={`http://localhost:8081${athlete.medical_form_url}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <Download size={14} /> Visualizar
-                                </a>
-                              ) : (
-                                <span className="text-gray-500 text-sm">Não anexado</span>
-                              )}
+                          <h3 className="text-sm font-medium text-gray-400 mb-3">📞 Contato & Endereço</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-gray-400 flex items-center gap-1">
+                                <Phone size={14} /> Telefone:
+                              </span>
+                              <span className="font-medium text-green-400">
+                                {formatPhone(athlete.phone)}
+                              </span>
                             </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Users size={16} className="text-blue-400" />
-                                <span className="text-sm">Foto</span>
-                              </div>
-                              {athlete.avatar_url ? (
-                                <a
-                                  href={getImageUrl(athlete.avatar_url) || '#'}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <Download size={14} /> Visualizar
-                                </a>
-                              ) : (
-                                <span className="text-gray-500 text-sm">Não anexada</span>
-                              )}
+                            <div className="flex justify-between">
+                              <span className="text-gray-400 flex items-center gap-1">
+                                <MapPin size={14} /> Endereço:
+                              </span>
+                              <span className="font-medium text-sm text-right max-w-[180px]">
+                                {athlete.address || "Não informado"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400 flex items-center gap-1">
+                                <Home size={14} /> Bairro:
+                              </span>
+                              <span className="font-medium">
+                                {athlete.neighborhood || "Não informado"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400 flex items-center gap-1">
+                                <Building size={14} /> Cidade/UF:
+                              </span>
+                              <span className="font-medium">
+                                {athlete.city || ""} {athlete.state ? `- ${athlete.state}` : ""}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">CEP:</span>
+                              <span className="font-medium">
+                                {athlete.zip_code || "Não informado"}
+                              </span>
                             </div>
                           </div>
                         </div>
 
+                        {/* Coluna 3 - Emergência e Documentos */}
                         <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-4">
-                          <h3 className="text-sm font-medium text-gray-400 mb-3">⚡ Ações Rápidas</h3>
+                          <h3 className="text-sm font-medium text-gray-400 mb-3">🆘 Emergência & Documentos</h3>
                           <div className="space-y-2">
-                            <Link
-                              href={`/dashboard/athletes/${athlete.id}`}
-                              className="flex items-center gap-2 w-full px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition text-sm"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Eye size={16} /> Ver Perfil Completo
-                            </Link>
-                            <Link
-                              href={`/dashboard/athletes/${athlete.id}/edit`}
-                              className="flex items-center gap-2 w-full px-3 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 rounded-lg transition text-sm"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Pencil size={16} /> Editar Cadastro
-                            </Link>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteAthlete(athlete.id);
-                              }}
-                              className="flex items-center gap-2 w-full px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition text-sm"
-                            >
-                              <Trash2 size={16} /> Excluir Atleta
-                            </button>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400 flex items-center gap-1">
+                                <AlertTriangle size={14} /> Contato:
+                              </span>
+                              <span className="font-medium text-sm text-right max-w-[180px]">
+                                {athlete.emergency_contact || "Não informado"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400 flex items-center gap-1">
+                                <Phone size={14} /> Tel. Emergência:
+                              </span>
+                              <span className="font-medium text-red-400">
+                                {athlete.emergency_phone || "Não informado"}
+                              </span>
+                            </div>
+                            <div className="border-t border-[#30363D] pt-2 mt-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <FileText size={16} className="text-purple-400" />
+                                  <span className="text-sm">Ficha Médica</span>
+                                </div>
+                                {athlete.medical_form_url ? (
+                                  <a
+                                    href={`http://localhost:8081${athlete.medical_form_url}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-purple-400 hover:text-purple-300 text-sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Download size={14} /> Visualizar
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-500 text-sm">Não anexado</span>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-between mt-1">
+                                <div className="flex items-center gap-2">
+                                  <Users size={16} className="text-blue-400" />
+                                  <span className="text-sm">Foto</span>
+                                </div>
+                                {athlete.avatar_url ? (
+                                  <a
+                                    href={getImageUrl(athlete.avatar_url) || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Download size={14} /> Visualizar
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-500 text-sm">Não anexada</span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
+                      </div>
+
+                      {/* Botões de Ação Rápida */}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Link
+                          href={`/dashboard/athletes/${athlete.id}`}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition text-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Eye size={16} /> Ver Perfil Completo
+                        </Link>
+                        <Link
+                          href={`/dashboard/athletes/${athlete.id}/edit`}
+                          className="flex items-center gap-2 px-4 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 rounded-lg transition text-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Pencil size={16} /> Editar Cadastro
+                        </Link>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteAthlete(athlete.id);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition text-sm"
+                        >
+                          <Trash2 size={16} /> Excluir Atleta
+                        </button>
                       </div>
                     </div>
                   )}

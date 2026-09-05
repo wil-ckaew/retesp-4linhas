@@ -1,3 +1,4 @@
+//mobile/src/screens/AttendanceScreen.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -11,13 +12,23 @@ import {
   Dimensions,
   Modal,
   TextInput,
+  Image,
+  FlatList,
+  LayoutAnimation,
+  UIManager,
+  Platform,
 } from 'react-native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { API_URL } from '../services/api';
-import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
+
+// Habilita animações para Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface Athlete {
   id: string;
@@ -31,10 +42,66 @@ interface AttendanceStatus {
   name: string;
   category: string;
   present: boolean;
+  avatar_url: string | null;
 }
+
+interface AttendanceRecord {
+  date: string;
+  present: boolean;
+}
+
+interface AthleteAttendanceStats {
+  athlete_id: string;
+  name: string;
+  category: string;
+  avatar_url: string | null;
+  total: number;
+  present: number;
+  absent: number;
+  percentage: number;
+  records: AttendanceRecord[];
+}
+
+// Função para formatar data DD/MM/YYYY
+const formatDate = (text: string) => {
+  const cleaned = text.replace(/\D/g, '');
+  let formatted = cleaned;
+  if (cleaned.length > 2) {
+    formatted = cleaned.slice(0, 2) + '/' + cleaned.slice(2);
+  }
+  if (cleaned.length > 4) {
+    formatted = formatted.slice(0, 5) + '/' + cleaned.slice(4, 8);
+  }
+  return formatted;
+};
+
+// Função para converter DD/MM/YYYY para YYYY-MM-DD
+const convertToBackendDate = (dateStr: string) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
+};
+
+// Função para converter YYYY-MM-DD para DD/MM/YYYY
+const convertToDisplayDate = (dateStr: string) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+};
 
 export default function AttendanceScreen() {
   const { colors, isDark } = useTheme();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const params = route.params as { athleteId?: string } | undefined;
+  const filterAthleteId = params?.athleteId;
+  
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [attendance, setAttendance] = useState<AttendanceStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,8 +110,16 @@ export default function AttendanceScreen() {
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDate, setTempDate] = useState('');
+  const [displayDate, setDisplayDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [athleteName, setAthleteName] = useState<string>('');
+  
+  // Estados para histórico do atleta
+  const [expandedAthlete, setExpandedAthlete] = useState<string | null>(null);
+  const [athleteHistory, setAthleteHistory] = useState<Record<string, AthleteAttendanceStats>>({});
+  const [loadingHistory, setLoadingHistory] = useState<Record<string, boolean>>({});
 
   const [stats, setStats] = useState({
     total: 0,
@@ -52,6 +127,32 @@ export default function AttendanceScreen() {
     absent: 0,
     percentage: 0,
   });
+
+  // Função para obter URL da imagem
+  const getAvatarUrl = (avatar_url: string | null): string | null => {
+    if (!avatar_url) return null;
+    if (avatar_url.startsWith('http://') || avatar_url.startsWith('https://')) {
+      return avatar_url;
+    }
+    if (avatar_url.startsWith('/uploads/')) {
+      let url = avatar_url;
+      if (url.endsWith('.bin')) {
+        url = url.replace('.bin', '.jpg');
+      }
+      if (!url.includes('.')) {
+        url = url + '.jpg';
+      }
+      return `${API_URL}${url}`;
+    }
+    if (avatar_url.startsWith('/')) {
+      return `${API_URL}${avatar_url}`;
+    }
+    return `${API_URL}/uploads/${avatar_url}`;
+  };
+
+  const handleImageError = (id: string) => {
+    setImageErrors(prev => ({ ...prev, [id]: true }));
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -129,6 +230,8 @@ export default function AttendanceScreen() {
     },
     dateArrow: {
       padding: 8,
+      width: 44,
+      alignItems: 'center',
     },
     dateDisplay: {
       flexDirection: 'row',
@@ -158,9 +261,6 @@ export default function AttendanceScreen() {
       borderWidth: 1,
       borderColor: colors.border,
       marginBottom: 8,
-    },
-    searchIcon: {
-      marginRight: 8,
     },
     searchInput: {
       flex: 1,
@@ -272,10 +372,16 @@ export default function AttendanceScreen() {
       borderColor: '#10B98140',
       backgroundColor: '#10B98110',
     },
+    athleteItemExpanded: {
+      borderColor: colors.primary,
+      borderWidth: 2,
+      backgroundColor: colors.primary + '10',
+    },
     athleteInfo: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
+      flex: 1,
     },
     athleteAvatar: {
       width: 40,
@@ -284,11 +390,21 @@ export default function AttendanceScreen() {
       backgroundColor: colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
+      overflow: 'hidden',
+    },
+    athleteAvatarImage: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      resizeMode: 'cover',
     },
     athleteAvatarText: {
       color: '#FFFFFF',
       fontSize: 16,
       fontWeight: 'bold',
+    },
+    athleteNameContainer: {
+      flex: 1,
     },
     athleteName: {
       color: colors.text,
@@ -331,6 +447,146 @@ export default function AttendanceScreen() {
       color: '#EF4444',
       fontSize: 11,
       fontWeight: '500',
+    },
+    expandButton: {
+      padding: 4,
+      marginLeft: 4,
+    },
+    expandedContent: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.primary + '40',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    expandedHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    expandedAthleteInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    expandedAvatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+    },
+    expandedAvatarImage: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      resizeMode: 'cover',
+    },
+    expandedAvatarText: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    expandedName: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    expandedCategory: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    closeExpanded: {
+      padding: 8,
+      backgroundColor: colors.hover,
+      borderRadius: 20,
+    },
+    historyHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    historyTitle: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    historyStats: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    historyStat: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    historyStatText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    historyStatValue: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    historyList: {
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      padding: 8,
+      maxHeight: 200,
+    },
+    historyItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    historyItemLast: {
+      borderBottomWidth: 0,
+    },
+    historyDate: {
+      color: colors.text,
+      fontSize: 13,
+    },
+    historyStatus: {
+      fontSize: 13,
+      fontWeight: '500',
+    },
+    historyStatusPresent: {
+      color: '#10B981',
+    },
+    historyStatusAbsent: {
+      color: '#EF4444',
+    },
+    historyDay: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    historyEmpty: {
+      padding: 12,
+      alignItems: 'center',
+    },
+    historyEmptyText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    historyLoading: {
+      padding: 12,
+      alignItems: 'center',
     },
     saveButton: {
       flexDirection: 'row',
@@ -397,8 +653,14 @@ export default function AttendanceScreen() {
       paddingVertical: 10,
       color: colors.text,
       fontSize: 16,
-      marginBottom: 16,
+      marginBottom: 8,
       textAlign: 'center',
+    },
+    dateHelper: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      textAlign: 'center',
+      marginBottom: 16,
     },
     modalButtons: {
       flexDirection: 'row',
@@ -433,36 +695,56 @@ export default function AttendanceScreen() {
     },
   });
 
+  // ========== FUNÇÕES PRINCIPAIS ==========
+
   const fetchAthletes = async () => {
     try {
       const res = await fetch(`${API_URL}/athletes?_t=${Date.now()}`);
       const data = await res.json();
-      setAthletes(data || []);
       
-      const initialAttendance = (data || []).map((athlete: any) => ({
+      // Filtrar por atleta específico se tiver ID
+      let filteredData = data || [];
+      if (filterAthleteId) {
+        filteredData = filteredData.filter((a: any) => a.id === filterAthleteId);
+        if (filteredData.length > 0) {
+          setAthleteName(filteredData[0].name);
+          console.log(`📋 Visualizando presenças de: ${filteredData[0].name}`);
+        }
+      }
+      
+      setAthletes(filteredData);
+      setImageErrors({});
+      
+      const initialAttendance = filteredData.map((athlete: any) => ({
         athlete_id: athlete.id,
         name: athlete.name,
         category: athlete.category,
         present: false,
+        avatar_url: athlete.avatar_url,
       }));
       setAttendance(initialAttendance);
       updateStats(initialAttendance);
       
     } catch (error) {
       console.error('Erro ao carregar atletas:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os atletas');
+      Alert.alert('❌ Erro', 'Não foi possível carregar os atletas');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const fetchAttendance = async () => {
+  // ========== BUSCAR PRESENÇA POR DATA ESPECÍFICA ==========
+  const fetchAttendanceByDate = async (date: string) => {
     try {
-      const date = selectedDate || new Date().toISOString().split('T')[0];
+      console.log(`📡 Buscando chamada para data: ${date}`);
+      
       const res = await fetch(`${API_URL}/attendance/today?date=${date}&_t=${Date.now()}`);
+      
       if (res.ok) {
         const data = await res.json();
+        console.log(`✅ ${data.length} registros encontrados para ${date}`);
+        
         const updatedAttendance = attendance.map((item) => {
           const found = data.find((d: any) => d.athlete_id === item.athlete_id);
           return {
@@ -470,24 +752,98 @@ export default function AttendanceScreen() {
             present: found ? found.present : false,
           };
         });
+        
         setAttendance(updatedAttendance);
         updateStats(updatedAttendance);
+      } else {
+        console.warn(`⚠️ Nenhum registro encontrado para ${date}`);
+        const resetAttendance = attendance.map((item) => ({
+          ...item,
+          present: false,
+        }));
+        setAttendance(resetAttendance);
+        updateStats(resetAttendance);
       }
     } catch (error) {
-      console.error('Erro ao carregar chamada:', error);
+      console.error('Erro ao buscar chamada:', error);
     }
   };
 
+  // ========== BUSCAR HISTÓRICO DO ATLETA ==========
+  const fetchAthleteHistory = async (athleteId: string) => {
+    if (athleteHistory[athleteId]) return;
+
+    setLoadingHistory(prev => ({ ...prev, [athleteId]: true }));
+
+    try {
+      const res = await fetch(`${API_URL}/attendance/athlete/${athleteId}?_t=${Date.now()}`);
+      if (res.ok) {
+        const data: AttendanceRecord[] = await res.json();
+        
+        const total = data.length;
+        const present = data.filter(r => r.present).length;
+        const absent = total - present;
+        const percentage = total > 0 ? (present / total) * 100 : 0;
+
+        const sortedRecords = [...data].sort((a, b) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+
+        const athlete = athletes.find(a => a.id === athleteId);
+
+        setAthleteHistory(prev => ({
+          ...prev,
+          [athleteId]: {
+            athlete_id: athleteId,
+            name: athlete?.name || '',
+            category: athlete?.category || '',
+            avatar_url: athlete?.avatar_url || null,
+            total,
+            present,
+            absent,
+            percentage,
+            records: sortedRecords,
+          }
+        }));
+      } else {
+        console.error('Erro ao buscar histórico:', res.status);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar histórico:', error);
+    } finally {
+      setLoadingHistory(prev => ({ ...prev, [athleteId]: false }));
+    }
+  };
+
+  // ========== TOGGLE EXPANSÃO ==========
+  const toggleExpand = (athleteId: string) => {
+    if (Platform.OS === 'android') {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
+
+    if (expandedAthlete === athleteId) {
+      setExpandedAthlete(null);
+    } else {
+      setExpandedAthlete(athleteId);
+      if (!athleteHistory[athleteId]) {
+        fetchAthleteHistory(athleteId);
+      }
+    }
+  };
+
+  // ========== EFFECTS ==========
   useEffect(() => {
     fetchAthletes();
   }, []);
 
   useEffect(() => {
     if (athletes.length > 0) {
-      fetchAttendance();
+      const date = selectedDate || new Date().toISOString().split('T')[0];
+      fetchAttendanceByDate(date);
     }
-  }, [selectedDate]);
+  }, [selectedDate, athletes]);
 
+  // ========== FUNÇÕES DE UI ==========
   const updateStats = (attendanceList: AttendanceStatus[]) => {
     const total = attendanceList.length;
     const present = attendanceList.filter(a => a.present).length;
@@ -521,6 +877,7 @@ export default function AttendanceScreen() {
     return filtered;
   };
 
+  // ========== SALVAR CHAMADA ==========
   const saveAttendance = async () => {
     try {
       setSaving(true);
@@ -553,18 +910,22 @@ export default function AttendanceScreen() {
         }
       }
 
+      setAthleteHistory({});
+      setExpandedAthlete(null);
+
       if (errorCount === 0) {
         Alert.alert(
           '✅ Sucesso!',
-          `Chamada salva com sucesso!\n\n📅 Data: ${new Date(date).toLocaleDateString('pt-BR')}\n✅ Presentes: ${stats.present}\n❌ Ausentes: ${stats.absent}\n📊 Taxa: ${stats.percentage.toFixed(0)}%`,
+          `Chamada salva com sucesso!\n\n📅 Data: ${formatDateDisplay(date)}\n✅ Presentes: ${stats.present}\n❌ Ausentes: ${stats.absent}\n📊 Taxa: ${stats.percentage.toFixed(0)}%`,
           [
             { 
               text: 'OK', 
               onPress: () => {
-                fetchAthletes();
-                if (athletes.length > 0) {
-                  fetchAttendance();
-                }
+                fetchAttendanceByDate(date);
+                navigation.navigate('Dashboard' as never);
+                setTimeout(() => {
+                  navigation.goBack();
+                }, 300);
               }
             }
           ]
@@ -606,10 +967,11 @@ export default function AttendanceScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
+    setAthleteHistory({});
+    setExpandedAthlete(null);
+    const date = selectedDate || new Date().toISOString().split('T')[0];
     fetchAthletes();
-    if (athletes.length > 0) {
-      fetchAttendance();
-    }
+    fetchAttendanceByDate(date);
   };
 
   const getTodayDate = () => {
@@ -634,15 +996,162 @@ export default function AttendanceScreen() {
     setSelectedDate(newDate);
   };
 
-  const categories = Array.from(new Set(athletes.map(a => a.category)));
+  const handleDateChange = (text: string) => {
+    const formatted = formatDate(text);
+    setDisplayDate(formatted);
+    setTempDate(formatted);
+  };
 
+  const confirmDate = () => {
+    if (displayDate) {
+      const parts = displayDate.split('/');
+      if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+        const formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        setSelectedDate(formattedDate);
+        setTempDate('');
+        setDisplayDate('');
+        setShowDatePicker(false);
+      } else {
+        Alert.alert('❌ Erro', 'Data incompleta. Use o formato DD/MM/AAAA (ex: 15/03/2024)');
+      }
+    }
+  };
+
+  // ========== RENDER EXPANDED CONTENT ==========
+  const renderExpandedContent = (athleteId: string) => {
+    const history = athleteHistory[athleteId];
+    const isLoading = loadingHistory[athleteId];
+    const athlete = athletes.find(a => a.id === athleteId);
+
+    if (isLoading) {
+      return (
+        <View style={styles.historyLoading}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.historyEmptyText}>⏳ Carregando histórico...</Text>
+        </View>
+      );
+    }
+
+    if (!history || history.records.length === 0) {
+      return (
+        <View style={styles.historyEmpty}>
+          <Text style={{ fontSize: 30 }}>📭</Text>
+          <Text style={styles.historyEmptyText}>Nenhum registro de presença encontrado</Text>
+        </View>
+      );
+    }
+
+    const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+    return (
+      <View style={styles.expandedContent}>
+        <View style={styles.expandedHeader}>
+          <View style={styles.expandedAthleteInfo}>
+            <View style={styles.expandedAvatar}>
+              {athlete?.avatar_url ? (
+                <Image
+                  source={{ uri: getAvatarUrl(athlete.avatar_url) || undefined }}
+                  style={styles.expandedAvatarImage}
+                />
+              ) : (
+                <Text style={styles.expandedAvatarText}>
+                  {athlete?.name?.charAt(0).toUpperCase() || '?'}
+                </Text>
+              )}
+            </View>
+            <View>
+              <Text style={styles.expandedName}>{history.name}</Text>
+              <Text style={styles.expandedCategory}>{history.category}</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.closeExpanded}
+            onPress={() => setExpandedAthlete(null)}
+          >
+            <Text style={{ fontSize: 18 }}>✖️</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.historyHeader}>
+          <Text style={styles.historyTitle}>📊 Histórico de Presenças</Text>
+          <View style={styles.historyStats}>
+            <View style={styles.historyStat}>
+              <Text style={{ fontSize: 12 }}>✅</Text>
+              <Text style={[styles.historyStatValue, { color: '#10B981' }]}>
+                {history.present}
+              </Text>
+            </View>
+            <View style={styles.historyStat}>
+              <Text style={{ fontSize: 12 }}>❌</Text>
+              <Text style={[styles.historyStatValue, { color: '#EF4444' }]}>
+                {history.absent}
+              </Text>
+            </View>
+            <View style={styles.historyStat}>
+              <Text style={{ fontSize: 12 }}>📊</Text>
+              <Text style={[styles.historyStatValue, { color: colors.primary }]}>
+                {history.percentage.toFixed(0)}%
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.historyList}>
+          <FlatList
+            data={history.records.slice(0, 20)}
+            keyExtractor={(item, index) => `${athleteId}-${index}`}
+            scrollEnabled={true}
+            renderItem={({ item, index }) => {
+              const date = new Date(item.date);
+              const isLast = index === history.records.slice(0, 20).length - 1;
+              return (
+                <View style={[styles.historyItem, isLast && styles.historyItemLast]}>
+                  <Text style={styles.historyDate}>
+                    {date.toLocaleDateString('pt-BR')}
+                  </Text>
+                  <Text style={[styles.historyStatus, item.present ? styles.historyStatusPresent : styles.historyStatusAbsent]}>
+                    {item.present ? '✅ Presente' : '❌ Faltou'}
+                  </Text>
+                  <Text style={styles.historyDay}>
+                    {weekDays[date.getDay()]}
+                  </Text>
+                </View>
+              );
+            }}
+            ListFooterComponent={() => {
+              if (history.records.length > 20) {
+                return (
+                  <TouchableOpacity
+                    onPress={() => {
+                      Alert.alert(
+                        '📊 Histórico Completo',
+                        `Total de registros: ${history.records.length}\n✅ Presentes: ${history.present}\n❌ Ausentes: ${history.absent}\n📊 Taxa: ${history.percentage.toFixed(0)}%`
+                      );
+                    }}
+                    style={{ padding: 8, alignItems: 'center' }}
+                  >
+                    <Text style={{ color: colors.primary, fontSize: 12 }}>
+                      Ver todos os {history.records.length} registros
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }
+              return null;
+            }}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  const categories = Array.from(new Set(athletes.map(a => a.category)));
   const filteredAthletes = getFilteredAthletes();
 
   if (loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Carregando chamada...</Text>
+        <Text style={styles.loadingText}>⏳ Carregando chamada...</Text>
       </View>
     );
   }
@@ -655,16 +1164,13 @@ export default function AttendanceScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Header com nome do atleta */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>📋 Chamada</Text>
+          <Text style={styles.headerTitle}>
+            {filterAthleteId && athleteName ? `📋 Chamada - ${athleteName}` : '📋 Chamada'}
+          </Text>
           <Text style={styles.headerSubtitle}>
-            {new Date(selectedDate || getTodayDate()).toLocaleDateString('pt-BR', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
+            {formatDateDisplay(selectedDate || getTodayDate())}
           </Text>
         </View>
 
@@ -691,28 +1197,37 @@ export default function AttendanceScreen() {
         {/* Date Selector */}
         <View style={styles.dateContainer}>
           <TouchableOpacity onPress={() => changeDate(-1)} style={styles.dateArrow}>
-            <Icon name="chevron-back" size={24} color={colors.textSecondary} />
+            <Text style={{ fontSize: 28 }}>◀️</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.dateDisplay}
-            onPress={() => setShowDatePicker(true)}
+            onPress={() => {
+              if (selectedDate) {
+                setDisplayDate(convertToDisplayDate(selectedDate));
+                setTempDate(convertToDisplayDate(selectedDate));
+              } else {
+                setDisplayDate('');
+                setTempDate('');
+              }
+              setShowDatePicker(true);
+            }}
           >
-            <Icon name="calendar-outline" size={20} color={colors.primary} />
+            <Text style={{ fontSize: 16 }}>📅</Text>
             <Text style={styles.dateText}>
               {selectedDate ? formatDateDisplay(selectedDate) : 'Hoje'}
             </Text>
           </TouchableOpacity>
           
           <TouchableOpacity onPress={() => changeDate(1)} style={styles.dateArrow}>
-            <Icon name="chevron-forward" size={24} color={colors.textSecondary} />
+            <Text style={{ fontSize: 28 }}>▶️</Text>
           </TouchableOpacity>
         </View>
 
         {/* Busca e Filtros */}
         <View style={styles.filtersContainer}>
           <View style={styles.searchContainer}>
-            <Icon name="search-outline" size={18} color={colors.textSecondary} style={styles.searchIcon} />
+            <Text style={{ fontSize: 16 }}>🔍</Text>
             <TextInput
               style={styles.searchInput}
               placeholder="Buscar atleta..."
@@ -720,6 +1235,11 @@ export default function AttendanceScreen() {
               value={searchTerm}
               onChangeText={setSearchTerm}
             />
+            {searchTerm !== '' && (
+              <TouchableOpacity onPress={() => setSearchTerm('')}>
+                <Text style={{ fontSize: 16 }}>✖️</Text>
+              </TouchableOpacity>
+            )}
           </View>
           
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryFilter}>
@@ -728,7 +1248,7 @@ export default function AttendanceScreen() {
               onPress={() => setSelectedCategory('all')}
             >
               <Text style={[styles.categoryText, selectedCategory === 'all' && styles.categoryTextActive]}>
-                Todas
+                🏷️ Todas
               </Text>
             </TouchableOpacity>
             {categories.map((cat) => (
@@ -748,7 +1268,7 @@ export default function AttendanceScreen() {
         {/* Progress Bar */}
         <View style={styles.progressContainer}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>Taxa de Presença</Text>
+            <Text style={styles.progressTitle}>📊 Taxa de Presença</Text>
             <Text style={styles.progressValue}>{stats.percentage.toFixed(0)}%</Text>
           </View>
           <View style={styles.progressBar}>
@@ -767,14 +1287,14 @@ export default function AttendanceScreen() {
             style={[styles.bulkButton, styles.bulkPresent]}
             onPress={markAllPresent}
           >
-            <Icon name="checkmark-circle" size={18} color="#10B981" />
+            <Text style={{ fontSize: 16 }}>✅</Text>
             <Text style={styles.bulkButtonText}>Todos Presentes</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.bulkButton, styles.bulkAbsent]}
             onPress={markAllAbsent}
           >
-            <Icon name="close-circle" size={18} color="#EF4444" />
+            <Text style={{ fontSize: 16 }}>❌</Text>
             <Text style={styles.bulkButtonText}>Todos Ausentes</Text>
           </TouchableOpacity>
         </View>
@@ -785,53 +1305,88 @@ export default function AttendanceScreen() {
 
           {filteredAthletes.length === 0 ? (
             <View style={styles.emptyState}>
-              <Icon name="people-outline" size={40} color={colors.textSecondary} />
+              <Text style={{ fontSize: 40 }}>👥</Text>
               <Text style={styles.emptyText}>Nenhum atleta encontrado</Text>
             </View>
           ) : (
-            filteredAthletes.map((item) => (
-              <TouchableOpacity
-                key={item.athlete_id}
-                style={[
-                  styles.athleteItem,
-                  item.present && styles.athleteItemPresent,
-                ]}
-                onPress={() => toggleAttendance(item.athlete_id)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.athleteInfo}>
-                  <View style={styles.athleteAvatar}>
-                    <Text style={styles.athleteAvatarText}>
-                      {item.name.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text style={styles.athleteName}>{item.name}</Text>
-                    <Text style={styles.athleteCategory}>{item.category}</Text>
-                  </View>
-                </View>
-                <View style={styles.athleteStatus}>
-                  {item.present ? (
-                    <View style={styles.presentBadge}>
-                      <Icon name="checkmark" size={16} color="#10B981" />
-                      <Text style={styles.presentText}>Presente</Text>
+            <>
+              {filteredAthletes.map((item) => {
+                const avatarUrl = getAvatarUrl(item.avatar_url);
+                const hasError = imageErrors[item.athlete_id];
+                const showInitials = !avatarUrl || hasError;
+                const isExpanded = expandedAthlete === item.athlete_id;
+                
+                if (expandedAthlete && expandedAthlete !== item.athlete_id) {
+                  return null;
+                }
+                
+                return (
+                  <TouchableOpacity
+                    key={item.athlete_id}
+                    style={[
+                      styles.athleteItem,
+                      item.present && styles.athleteItemPresent,
+                      isExpanded && styles.athleteItemExpanded,
+                    ]}
+                    onPress={() => toggleAttendance(item.athlete_id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.athleteInfo}>
+                      <View style={styles.athleteAvatar}>
+                        {showInitials ? (
+                          <Text style={styles.athleteAvatarText}>
+                            {item.name.charAt(0).toUpperCase()}
+                          </Text>
+                        ) : (
+                          <Image
+                            source={{ uri: avatarUrl || undefined }}
+                            style={styles.athleteAvatarImage}
+                            onError={() => handleImageError(item.athlete_id)}
+                          />
+                        )}
+                      </View>
+                      <View style={styles.athleteNameContainer}>
+                        <Text style={styles.athleteName}>{item.name}</Text>
+                        <Text style={styles.athleteCategory}>{item.category}</Text>
+                      </View>
                     </View>
-                  ) : (
-                    <View style={styles.absentBadge}>
-                      <Icon name="close" size={16} color="#EF4444" />
-                      <Text style={styles.absentText}>Ausente</Text>
+                    <View style={styles.athleteStatus}>
+                      {item.present ? (
+                        <View style={styles.presentBadge}>
+                          <Text style={{ fontSize: 14 }}>✅</Text>
+                          <Text style={styles.presentText}>Presente</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.absentBadge}>
+                          <Text style={{ fontSize: 14 }}>❌</Text>
+                          <Text style={styles.absentText}>Ausente</Text>
+                        </View>
+                      )}
+                      
+                      <TouchableOpacity
+                        style={styles.expandButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          toggleExpand(item.athlete_id);
+                        }}
+                      >
+                        <Text style={{ fontSize: 22 }}>
+                          {isExpanded ? '🔽' : '▶️'}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
-                  )}
-                  <Icon 
-                    name={item.present ? 'checkmark-circle' : 'ellipse-outline'} 
-                    size={24} 
-                    color={item.present ? '#10B981' : colors.textSecondary} 
-                  />
-                </View>
-              </TouchableOpacity>
-            ))
+                  </TouchableOpacity>
+                );
+              })}
+            </>
           )}
         </View>
+
+        {expandedAthlete && (
+          <View>
+            {renderExpandedContent(expandedAthlete)}
+          </View>
+        )}
 
         {/* Save Button */}
         <TouchableOpacity
@@ -843,8 +1398,8 @@ export default function AttendanceScreen() {
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <>
-              <Icon name="save-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.saveButtonText}>💾 Salvar Chamada</Text>
+              <Text style={{ fontSize: 18 }}>💾</Text>
+              <Text style={styles.saveButtonText}>Salvar Chamada</Text>
             </>
           )}
         </TouchableOpacity>
@@ -857,50 +1412,58 @@ export default function AttendanceScreen() {
         visible={showDatePicker}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowDatePicker(false)}
+        onRequestClose={() => {
+          setShowDatePicker(false);
+          setTempDate('');
+          setDisplayDate('');
+        }}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>📅 Selecionar Data</Text>
             <TextInput
               style={styles.dateInput}
-              placeholder="YYYY-MM-DD"
+              placeholder="DD/MM/AAAA"
               placeholderTextColor={colors.textSecondary}
-              value={tempDate || selectedDate}
-              onChangeText={setTempDate}
+              value={displayDate}
+              onChangeText={handleDateChange}
+              keyboardType="numeric"
+              maxLength={10}
             />
+            <Text style={styles.dateHelper}>
+              Digite a data desejada e clique em Confirmar para visualizar a chamada daquele dia.
+              {'\n'}Exemplo: 15/03/2024
+            </Text>
+            
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonCancel]}
                 onPress={() => {
                   setTempDate('');
+                  setDisplayDate('');
                   setShowDatePicker(false);
                 }}
               >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
+                <Text style={styles.modalButtonText}>❌ Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonConfirm]}
-                onPress={() => {
-                  if (tempDate) {
-                    setSelectedDate(tempDate);
-                    setTempDate('');
-                  }
-                  setShowDatePicker(false);
-                }}
+                onPress={confirmDate}
               >
-                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Confirmar</Text>
+                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>✅ Confirmar</Text>
               </TouchableOpacity>
             </View>
+            
             <TouchableOpacity
               style={styles.todayButton}
               onPress={() => {
                 setSelectedDate('');
                 setTempDate('');
+                setDisplayDate('');
                 setShowDatePicker(false);
               }}
             >
-              <Text style={styles.todayButtonText}>Usar data de hoje</Text>
+              <Text style={styles.todayButtonText}>📅 Voltar para hoje</Text>
             </TouchableOpacity>
           </View>
         </View>

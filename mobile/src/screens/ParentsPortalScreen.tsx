@@ -1,3 +1,4 @@
+//mobile/src/screens/ParentsPortalScreen.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -16,10 +17,9 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
 import { API_URL } from '../services/api';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { useTheme } from '../context/ThemeContext';
 
 const isWeb = Platform.OS === 'web';
@@ -68,8 +68,15 @@ export default function ParentsPortalScreen() {
   const [newName, setNewName] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const videoRefs = useRef<{ [key: string]: any }>({});
   const flatListRef = useRef<FlatList>(null);
+
+  // Player para o vídeo em exibição
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
+  const player = useVideoPlayer(currentVideoUrl || '', (player) => {
+    if (currentVideoUrl) {
+      player.play();
+    }
+  });
 
   const styles = StyleSheet.create({
     container: {
@@ -113,6 +120,7 @@ export default function ParentsPortalScreen() {
     },
     searchIcon: {
       marginRight: 8,
+      fontSize: 20,
     },
     searchInput: {
       flex: 1,
@@ -285,10 +293,6 @@ export default function ParentsPortalScreen() {
       alignItems: 'center',
       position: 'relative',
     },
-    videoPreview: {
-      width: '100%',
-      height: '100%',
-    },
     videoPlayOverlay: {
       position: 'absolute',
       top: 0,
@@ -298,6 +302,10 @@ export default function ParentsPortalScreen() {
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: 'rgba(0,0,0,0.3)',
+    },
+    videoPlayIcon: {
+      fontSize: 50,
+      color: '#FFFFFF',
     },
     videoBadge: {
       position: 'absolute',
@@ -430,6 +438,10 @@ export default function ParentsPortalScreen() {
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.2)',
     },
+    closeIcon: {
+      fontSize: 30,
+      color: '#FFFFFF',
+    },
     deleteButtonModal: {
       position: 'absolute',
       top: 40,
@@ -440,6 +452,10 @@ export default function ParentsPortalScreen() {
       borderRadius: 30,
       borderWidth: 1,
       borderColor: 'rgba(239, 68, 68, 0.3)',
+    },
+    deleteIcon: {
+      fontSize: 26,
+      color: '#EF4444',
     },
     positionIndicator: {
       position: 'absolute',
@@ -517,6 +533,14 @@ export default function ParentsPortalScreen() {
       backgroundColor: colors.primary,
       width: 12,
       height: 8,
+    },
+    editIcon: {
+      fontSize: 16,
+      color: '#FFFFFF',
+    },
+    deleteIconSmall: {
+      fontSize: 16,
+      color: '#FFFFFF',
     },
   });
 
@@ -770,44 +794,20 @@ export default function ParentsPortalScreen() {
   const openMediaModal = (index: number) => {
     setSelectedMediaIndex(index);
     setModalVisible(true);
+    // Carregar o vídeo atual
+    const item = media[index];
+    if (item && (item.media_type === 'video' || item.file_url.match(/\.(mp4|mov|avi|webm)$/i))) {
+      setCurrentVideoUrl(`${API_URL}${item.file_url}`);
+    } else {
+      setCurrentVideoUrl(null);
+    }
   };
 
   const closeModal = () => {
     setModalVisible(false);
-    Object.keys(videoRefs.current).forEach((key) => {
-      if (videoRefs.current[key]) {
-        videoRefs.current[key].pauseAsync();
-      }
-    });
+    setCurrentVideoUrl(null);
+    player.pause();
     StatusBar.setHidden(false);
-  };
-
-  const goToNext = () => {
-    if (selectedMediaIndex < media.length - 1) {
-      const currentId = media[selectedMediaIndex]?.id;
-      if (currentId && videoRefs.current[currentId]) {
-        videoRefs.current[currentId].pauseAsync();
-      }
-      setSelectedMediaIndex(selectedMediaIndex + 1);
-      flatListRef.current?.scrollToIndex({
-        index: selectedMediaIndex + 1,
-        animated: true,
-      });
-    }
-  };
-
-  const goToPrevious = () => {
-    if (selectedMediaIndex > 0) {
-      const currentId = media[selectedMediaIndex]?.id;
-      if (currentId && videoRefs.current[currentId]) {
-        videoRefs.current[currentId].pauseAsync();
-      }
-      setSelectedMediaIndex(selectedMediaIndex - 1);
-      flatListRef.current?.scrollToIndex({
-        index: selectedMediaIndex - 1,
-        animated: true,
-      });
-    }
   };
 
   const deleteFromModal = () => {
@@ -824,25 +824,23 @@ export default function ParentsPortalScreen() {
 
     return (
       <TouchableOpacity
+        key={item.id}
         style={styles.mediaItem}
         onPress={() => openMediaModal(index)}
         activeOpacity={0.9}
       >
         {isVideo ? (
           <View style={styles.videoPreviewContainer}>
-            <Video
+            <Image
               source={{ uri: mediaUrl }}
-              style={styles.videoPreview}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay={false}
-              isLooping={false}
-              useNativeControls={false}
+              style={styles.mediaImage}
+              resizeMode="cover"
             />
             <View style={styles.videoPlayOverlay}>
-              <Icon name="play-circle" size={40} color={colors.primary} />
+              <Text style={styles.videoPlayIcon}>▶️</Text>
             </View>
             <View style={styles.videoBadge}>
-              <Icon name="videocam" size={12} color="#FFFFFF" />
+              <Text style={{ fontSize: 12, color: '#FFFFFF' }}>🎬</Text>
               <Text style={styles.videoBadgeText}>Vídeo</Text>
             </View>
           </View>
@@ -867,7 +865,7 @@ export default function ParentsPortalScreen() {
             }}
             style={styles.editButton}
           >
-            <Icon name="create-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.editIcon}>✏️</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             onPress={() => {
@@ -876,7 +874,7 @@ export default function ParentsPortalScreen() {
             }}
             style={styles.deleteButton}
           >
-            <Icon name="trash-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.deleteIconSmall}>🗑️</Text>
           </TouchableOpacity>
         </View>
 
@@ -896,7 +894,7 @@ export default function ParentsPortalScreen() {
                   onPress={() => renameMedia(item.id)}
                   style={styles.saveButton}
                 >
-                  <Text style={styles.saveButtonText}>Salvar</Text>
+                  <Text style={styles.saveButtonText}>💾 Salvar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   onPress={() => {
@@ -905,7 +903,7 @@ export default function ParentsPortalScreen() {
                   }}
                   style={styles.cancelEditButton}
                 >
-                  <Text style={styles.cancelEditText}>Cancelar</Text>
+                  <Text style={styles.cancelEditText}>❌ Cancelar</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -922,19 +920,11 @@ export default function ParentsPortalScreen() {
     return (
       <View style={styles.modalMediaContainer}>
         {isVideo ? (
-          <Video
-            ref={(ref) => {
-              if (ref) {
-                videoRefs.current[item.id] = ref;
-              }
-            }}
-            source={{ uri: mediaUrl }}
+          <VideoView
             style={styles.fullscreenVideo}
-            resizeMode={ResizeMode.CONTAIN}
-            shouldPlay={true}
-            useNativeControls={true}
-            isLooping={false}
-            onError={(e) => console.error('Erro no vídeo:', e)}
+            player={player}
+            contentFit="contain"
+            nativeControls={true}
           />
         ) : (
           <Image
@@ -980,7 +970,7 @@ export default function ParentsPortalScreen() {
       </View>
 
       <View style={styles.searchContainer}>
-        <Icon name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+        <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar atleta..."
@@ -1017,7 +1007,7 @@ export default function ParentsPortalScreen() {
             <Text style={styles.athleteCategory}>{athlete.category}</Text>
           </View>
           {selectedAthlete?.id === athlete.id && (
-            <Icon name="checkmark-circle" size={24} color="#10B981" />
+            <Text style={{ fontSize: 24, color: '#10B981' }}>✅</Text>
           )}
         </TouchableOpacity>
       ))}
@@ -1060,7 +1050,7 @@ export default function ParentsPortalScreen() {
                 onPress={() => fileInputRef.current?.click()}
                 disabled={uploading}
               >
-                <Icon name="cloud-upload-outline" size={24} color="#FFFFFF" />
+                <Text style={{ fontSize: 24 }}>☁️</Text>
                 <Text style={styles.uploadButtonText}>
                   {uploading ? 'Enviando...' : '📤 Fazer Upload'}
                 </Text>
@@ -1079,7 +1069,7 @@ export default function ParentsPortalScreen() {
               onPress={handleMobileFileSelect}
               disabled={uploading}
             >
-              <Icon name="cloud-upload-outline" size={24} color="#FFFFFF" />
+              <Text style={{ fontSize: 24 }}>☁️</Text>
               <Text style={styles.uploadButtonText}>
                 {uploading ? 'Enviando...' : '📤 Fazer Upload'}
               </Text>
@@ -1116,7 +1106,7 @@ export default function ParentsPortalScreen() {
 
       {showMedia && media.length === 0 && (
         <View style={styles.noMediaContainer}>
-          <Icon name="images-outline" size={40} color={colors.textSecondary} />
+          <Text style={{ fontSize: 40, color: colors.textSecondary }}>🖼️</Text>
           <Text style={styles.noMediaText}>Nenhuma mídia encontrada para este atleta</Text>
           <Text style={styles.noMediaSubtext}>Clique em "Fazer Upload" para adicionar</Text>
         </View>
@@ -1136,14 +1126,14 @@ export default function ParentsPortalScreen() {
             style={styles.closeButton}
             onPress={closeModal}
           >
-            <Icon name="close" size={30} color="#FFFFFF" />
+            <Text style={styles.closeIcon}>❌</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.deleteButtonModal}
             onPress={deleteFromModal}
           >
-            <Icon name="trash-outline" size={26} color="#EF4444" />
+            <Text style={styles.deleteIcon}>🗑️</Text>
           </TouchableOpacity>
 
           <View style={styles.positionIndicator}>
@@ -1167,9 +1157,11 @@ export default function ParentsPortalScreen() {
             onScroll={(event) => {
               const index = Math.round(event.nativeEvent.contentOffset.x / width);
               if (index !== selectedMediaIndex) {
-                const prevId = media[selectedMediaIndex]?.id;
-                if (prevId && videoRefs.current[prevId]) {
-                  videoRefs.current[prevId].pauseAsync();
+                // Pausar vídeo atual e carregar novo
+                if (media[index] && (media[index].media_type === 'video' || media[index].file_url.match(/\.(mp4|mov|avi|webm)$/i))) {
+                  setCurrentVideoUrl(`${API_URL}${media[index].file_url}`);
+                } else {
+                  setCurrentVideoUrl(null);
                 }
                 setSelectedMediaIndex(index);
               }
