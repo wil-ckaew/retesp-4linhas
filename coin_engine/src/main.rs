@@ -55,14 +55,14 @@ async fn add_coins(req: web::Json<TransactionRequest>) -> impl Responder {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
-    println!("💰 RETESP Coin Engine running on port 8004");
+    println!("💰 RETESP Coin Engine running on port 8080");
 
     HttpServer::new(|| {
         App::new()
             .route("/balance/{athlete_id}", web::get().to(get_balance))
             .route("/add", web::post().to(add_coins))
     })
-    .bind(("0.0.0.0", 8004))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await
 }

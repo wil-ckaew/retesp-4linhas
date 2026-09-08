@@ -58,12 +58,7 @@ export default function RankingPage() {
   const [totalAchievements, setTotalAchievements] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  // CORREÇÃO: URL do backend no Docker
-  // Em produção no Docker, o backend está em http://retesp-backend:8080
-  // Para desenvolvimento local, use http://localhost:8081
-  const API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-    ? 'http://localhost:8081' 
-    : 'http://retesp-backend:8080';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081';
 
   console.log('🔧 API_URL:', API_URL);
 

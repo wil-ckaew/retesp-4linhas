@@ -37,12 +37,9 @@ interface AthleteAttendanceStats {
   records: AttendanceRecord[];
 }
 
-// CORREÇÃO: URL correta para o backend no Docker
-// No Docker, o backend está em http://retesp-backend:8080
-// Para desenvolvimento local, use http://localhost:8081
-const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-  ? 'http://localhost:8081' 
-  : 'http://retesp-backend:8080';
+import { API_BASE_URL } from '@/lib/config';
+
+const API_BASE = API_BASE_URL;
 
 // Função para formatar data DD/MM/YYYY
 const formatDate = (text: string) => {

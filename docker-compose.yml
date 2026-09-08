@@ -1,8 +1,7 @@
-version: '3.8'
-
+# docker-compose.yml
 services:
   db:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: retesp-db
     restart: always
     environment:
@@ -10,13 +9,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-retesp}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-retesp123}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - retesp-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U retesp"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-retesp}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,7 +25,7 @@ services:
     container_name: retesp-redis
     restart: always
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     networks:
       - retesp-network
     healthcheck:
@@ -36,13 +35,13 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio
+    image: minio/minio:latest
     container_name: retesp-minio
     restart: always
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password123}
@@ -50,27 +49,45 @@ services:
       - minio_data:/data
     networks:
       - retesp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
   ollama:
     image: ollama/ollama:0.5.7
     container_name: retesp-ollama
     restart: always
     ports:
-      - "11434:11434"
+      - "${OLLAMA_PORT:-11434}:11434"
     volumes:
       - ollama_data:/root/.ollama
     networks:
       - retesp-network
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_MODELS=/root/.ollama/models
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: retesp-backend
     restart: always
     ports:
-      - "8081:8080"
+      - "${BACKEND_PORT:-8081}:8080"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-retesp}:${POSTGRES_PASSWORD:-retesp123}@db:5432/${POSTGRES_DB:-retesp}
-      JWT_SECRET: ${JWT_SECRET:-secret}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      RUST_LOG: ${RUST_LOG:-info}
+      API_URL: http://backend:8080
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-password123}
+      OLLAMA_URL: http://ollama:11434
     volumes:
       - ./uploads:/app/uploads
     depends_on:
@@ -79,57 +96,76 @@ services:
       redis:
         condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
       ollama:
         condition: service_started
     networks:
       - retesp-network
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: retesp-frontend
     restart: always
     ports:
-      - "3001:3000"
+      - "${FRONTEND_PORT:-3001}:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8081}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8081}
     depends_on:
       - backend
     networks:
       - retesp-network
 
   social_service:
-    build: ./social_service
+    build: 
+      context: ./social_service
+      dockerfile: Dockerfile
     container_name: retesp-social
     restart: always
     ports:
-      - "8082:8080"
+      - "${SOCIAL_PORT:-8082}:8002"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-retesp}:${POSTGRES_PASSWORD:-retesp123}@db:5432/${POSTGRES_DB:-retesp}
+      REDIS_URL: redis://redis:6379
+      API_URL: http://social_service:8002
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - retesp-network
 
   reports_service:
-    build: ./reports_service
+    build: 
+      context: ./reports_service
+      dockerfile: Dockerfile
     container_name: retesp-reports
     restart: always
     ports:
-      - "8083:8080"
+      - "${REPORTS_PORT:-8083}:8080"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-retesp}:${POSTGRES_PASSWORD:-retesp123}@db:5432/${POSTGRES_DB:-retesp}
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - retesp-network
 
   notification_worker:
-    build: ./notification_worker
+    build: 
+      context: ./notification_worker
+      dockerfile: Dockerfile
     container_name: retesp-notify
     restart: always
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-retesp}:${POSTGRES_PASSWORD:-retesp123}@db:5432/${POSTGRES_DB:-retesp}
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
         condition: service_healthy
@@ -139,49 +175,71 @@ services:
       - retesp-network
 
   coin_engine:
-    build: ./coin_engine
+    build: 
+      context: ./coin_engine
+      dockerfile: Dockerfile
     container_name: retesp-coins
     restart: always
     ports:
-      - "8084:8080"
+      - "${COIN_PORT:-8084}:8080"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-retesp}:${POSTGRES_PASSWORD:-retesp123}@db:5432/${POSTGRES_DB:-retesp}
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - retesp-network
 
   ai_service:
-    build: ./ai_service
+    build: 
+      context: ./ai_service
+      dockerfile: Dockerfile
     container_name: retesp-ai
     restart: always
     ports:
-      - "8085:8080"
+      - "${AI_PORT:-8085}:8080"
     environment:
       OLLAMA_URL: http://ollama:11434
+      REDIS_URL: redis://redis:6379
     depends_on:
       - ollama
+      - redis
     networks:
       - retesp-network
 
   video_ai:
-    build: ./video_ai
+    build: 
+      context: ./video_ai
+      dockerfile: Dockerfile
     container_name: retesp-video-ai
     restart: always
     ports:
-      - "8086:8080"
+      - "${VIDEO_AI_PORT:-8086}:8001"
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-password123}
+      REDIS_URL: redis://redis:6379
     depends_on:
       - ollama
       - minio
+      - redis
     networks:
       - retesp-network
 
 networks:
   retesp-network:
     driver: bridge
+    name: retesp-network
 
 volumes:
   postgres_data:
+    name: retesp-postgres-data
   minio_data:
+    name: retesp-minio-data
   ollama_data:
+    name: retesp-ollama-data

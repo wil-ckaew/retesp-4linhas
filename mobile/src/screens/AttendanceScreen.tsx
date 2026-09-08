@@ -19,7 +19,6 @@ import {
   Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/Ionicons';
 import { API_URL } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 
@@ -169,20 +168,26 @@ export default function AttendanceScreen() {
       color: colors.textSecondary,
       marginTop: 8,
     },
+    // ========== HEADER CORRIGIDO ==========
     header: {
       paddingHorizontal: 16,
       paddingTop: 16,
       paddingBottom: 8,
     },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
     headerTitle: {
-      fontSize: 24,
+      fontSize: 20,
       fontWeight: 'bold',
       color: colors.text,
+      flex: 1,
     },
     headerSubtitle: {
       fontSize: 14,
       color: colors.textSecondary,
-      marginTop: 4,
     },
     statsContainer: {
       flexDirection: 'row',
@@ -1164,14 +1169,16 @@ export default function AttendanceScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header com nome do atleta */}
+        {/* ========== HEADER CORRIGIDO - TÍTULO E DATA NA MESMA LINHA ========== */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {filterAthleteId && athleteName ? `📋 Chamada - ${athleteName}` : '📋 Chamada'}
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            {formatDateDisplay(selectedDate || getTodayDate())}
-          </Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.headerTitle}>
+              {filterAthleteId && athleteName ? `📋 Chamada - ${athleteName}` : '📋 Chamada'}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              {formatDateDisplay(selectedDate || getTodayDate())}
+            </Text>
+          </View>
         </View>
 
         {/* Stats */}

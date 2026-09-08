@@ -50,10 +50,12 @@ const mockTrainings = [
 ];
 
 // GET - Listar todos os treinos
+import { API_BASE_URL } from '@/lib/config';
+
 export async function GET() {
   try {
     // Tentar buscar do backend
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8081';
+    const backendUrl = process.env.BACKEND_URL || API_BASE_URL;
     const response = await fetch(`${backendUrl}/trainings`).catch(() => null);
     
     if (response && response.ok) {
@@ -75,7 +77,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     
     // Tentar enviar para o backend
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8081';
+    const backendUrl = process.env.BACKEND_URL || API_BASE_URL;
     const response = await fetch(`${backendUrl}/trainings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

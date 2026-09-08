@@ -163,12 +163,23 @@ struct CreateStoryRequest {
 }
 
 // --- HELPERS ---
-fn get_jwt_secret() -> String { 
-    env::var("JWT_SECRET").expect("JWT_SECRET must be set") 
+fn get_jwt_secret() -> String {
+    env::var("JWT_SECRET").expect("JWT_SECRET must be set")
 }
 
-fn get_ollama_url() -> String { 
-    "http://ollama:11434".to_string() 
+fn get_api_url() -> String {
+    env::var("API_URL").unwrap_or_else(|_| "http://localhost:8081".to_string())
+}
+
+fn get_ollama_url() -> String {
+    env::var("OLLAMA_URL").unwrap_or_else(|_| "http://ollama:11434".to_string())
+}
+
+fn get_app_port() -> u16 {
+    env::var("PORT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(8080)
 }
 
 fn generate_token(user_id: &str, role: &str) -> String {
@@ -1295,7 +1306,14 @@ async fn main() -> std::io::Result<()> {
         eprintln!("❌ Erro ao executar migrações: {}", e);
     }
     
+    let api_url = get_api_url();
+    let ollama_url = get_ollama_url();
+    let app_port = get_app_port();
+
     println!("🔥 RETESP Backend v42.0 (Com Stories)");
+    println!("📡 API_URL: {}", api_url);
+    println!("🤖 OLLAMA_URL: {}", ollama_url);
+    println!("🔌 PORT: {}", app_port);
 
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -1342,7 +1360,7 @@ async fn main() -> std::io::Result<()> {
             .route("/upload", web::post().to(upload_media))
             .route("/ai/generate_training", web::post().to(generate_training))
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind(("0.0.0.0", app_port))?
     .run()
     .await
 }

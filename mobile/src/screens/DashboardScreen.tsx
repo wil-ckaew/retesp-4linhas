@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   Dimensions,
   Image,
-  FlatList,
   Animated,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -52,6 +51,42 @@ interface RankingAthlete {
   total_classes: number;
   ranking_position: number;
   perfect_attendance: boolean;
+}
+
+// ========== COMPONENTE DE LOGO IGUAL AO APP.TSX ==========
+function LogoTitle() {
+  const { colors } = useTheme();
+  
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <View style={{ 
+        width: 40, 
+        height: 40, 
+        borderRadius: 10, 
+        overflow: 'hidden',
+        backgroundColor: colors.card,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: colors.border,
+        padding: 4,
+      }}>
+        <Image 
+          source={require('../../assets/logo.png')} 
+          style={{ width: 32, height: 32 }}
+          resizeMode="contain"
+        />
+      </View>
+      <View style={{ flexDirection: 'column' }}>
+        <Text style={{ color: '#EF4444', fontSize: 18, fontWeight: '900', letterSpacing: -0.5, lineHeight: 20 }}>
+          RETESP
+        </Text>
+        <Text style={{ color: '#10B981', fontSize: 11, fontWeight: 'bold', lineHeight: 13 }}>
+          4 Linhas
+        </Text>
+      </View>
+    </View>
+  );
 }
 
 export default function DashboardScreen() {
@@ -148,28 +183,36 @@ export default function DashboardScreen() {
       color: '#FFFFFF',
       fontWeight: '600',
     },
+    // ========== HEADER COM LOGO IGUAL AO APP.TSX ==========
     header: {
       flexDirection: 'row',
+      alignItems: 'center',
       justifyContent: 'space-between',
-      alignItems: 'flex-start',
       paddingHorizontal: 16,
-      paddingTop: 16,
+      paddingTop: 12,
       paddingBottom: 8,
     },
+    headerCenter: {
+      flex: 1,
+      alignItems: 'center',
+    },
     headerTitle: {
-      fontSize: 24,
+      fontSize: 20,
       fontWeight: 'bold',
       color: colors.text,
     },
     headerSubtitle: {
-      fontSize: 14,
+      fontSize: 12,
       color: colors.textSecondary,
-      marginTop: 2,
     },
     headerUpdate: {
-      fontSize: 11,
+      fontSize: 10,
       color: colors.textSecondary,
-      marginTop: 2,
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
     },
     refreshButton: {
       padding: 8,
@@ -580,13 +623,11 @@ export default function DashboardScreen() {
 
   // ========== FUNÇÃO PARA INICIAR O CARROSSEL ==========
   const startCarousel = useCallback(() => {
-    // Limpar intervalo existente
     if (carouselInterval.current) {
       clearInterval(carouselInterval.current);
       carouselInterval.current = null;
     }
 
-    // Verificar se há mais de um campeão
     if (championCarousel.length <= 1) {
       setShowChampionCarousel(false);
       setCarouselStarted(false);
@@ -596,9 +637,7 @@ export default function DashboardScreen() {
     setShowChampionCarousel(true);
     setCarouselStarted(true);
 
-    // Iniciar novo intervalo
     carouselInterval.current = setInterval(() => {
-      // Animação de saída - SEM useNativeDriver
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -616,12 +655,10 @@ export default function DashboardScreen() {
           useNativeDriver: false,
         }),
       ]).start(() => {
-        // Mudar para o próximo
         setCurrentChampionIndex(prev => 
           prev === championCarousel.length - 1 ? 0 : prev + 1
         );
         
-        // Animação de entrada - SEM useNativeDriver
         slideAnim.setValue(20);
         scaleAnim.setValue(0.9);
         fadeAnim.setValue(0);
@@ -647,7 +684,6 @@ export default function DashboardScreen() {
     }, 3000);
   }, [championCarousel.length, fadeAnim, scaleAnim, slideAnim]);
 
-  // Parar carrossel
   const stopCarousel = useCallback(() => {
     if (carouselInterval.current) {
       clearInterval(carouselInterval.current);
@@ -663,26 +699,20 @@ export default function DashboardScreen() {
       setError(null);
 
       console.log('📡 Buscando dados do dashboard...');
-      console.log('🔗 API_URL:', API_URL);
 
-      // 1. Buscar atletas
       const athletesRes = await fetch(`${API_URL}/athletes?_t=${Date.now()}`);
-      
       if (!athletesRes.ok) {
         throw new Error(`Erro ao buscar atletas: ${athletesRes.status}`);
       }
-      
       const athletesData = await athletesRes.json();
       console.log('✅ Atletas carregados:', athletesData?.length || 0);
       
-      // 2. Buscar coaches
       const coachesRes = await fetch(`${API_URL}/coaches?_t=${Date.now()}`);
       let coachesData = [];
       if (coachesRes.ok) {
         coachesData = await coachesRes.json();
       }
       
-      // 3. Buscar teams
       const teamsRes = await fetch(`${API_URL}/teams?_t=${Date.now()}`);
       let teamsData = [];
       if (teamsRes.ok) {
@@ -693,7 +723,6 @@ export default function DashboardScreen() {
       const totalCoaches = coachesData?.length || 0;
       const totalTeams = teamsData?.length || 0;
 
-      // 4. Buscar chamada de hoje
       const today = new Date().toISOString().split('T')[0];
       let presentToday = 0;
       let absentToday = 0;
@@ -715,7 +744,6 @@ export default function DashboardScreen() {
 
       const attendanceRate = totalAthletes > 0 ? (presentToday / totalAthletes) * 100 : 0;
 
-      // 5. Buscar ranking de presença
       let rankingData: RankingAthlete[] = [];
       
       try {
@@ -794,9 +822,8 @@ export default function DashboardScreen() {
     }
   };
 
-  // ========== ATUALIZAR CARROSSEL QUANDO O RANKING MUDAR ==========
+  // ========== EFFECTS ==========
   useEffect(() => {
-    // Parar carrossel atual
     stopCarousel();
     
     if (rankingTop3.length > 0) {
@@ -806,14 +833,11 @@ export default function DashboardScreen() {
       setChampionCarousel(tiedAthletes);
       setCurrentChampionIndex(0);
       
-      // Reiniciar animações
       fadeAnim.setValue(1);
       scaleAnim.setValue(1);
       slideAnim.setValue(0);
       
-      // Iniciar carrossel se houver mais de 1
       if (tiedAthletes.length > 1) {
-        // Pequeno delay para garantir que o estado foi atualizado
         setTimeout(() => {
           startCarousel();
         }, 500);
@@ -832,27 +856,22 @@ export default function DashboardScreen() {
     };
   }, [rankingTop3]);
 
-  // ========== USE FOCUS EFFECT ==========
   useFocusEffect(
     useCallback(() => {
       console.log('🔄 Dashboard em foco, atualizando dados...');
       fetchDashboardData();
-      
-      // Quando a tela ganhar foco, verificar se o carrossel precisa ser reiniciado
       return () => {
         stopCarousel();
       };
     }, [])
   );
 
-  // ========== EFFECT PARA INICIAR O CARROSSEL APÓS CARREGAR ==========
   useEffect(() => {
     if (rankingTop3.length > 0 && championCarousel.length > 1 && !carouselStarted) {
       startCarousel();
     }
   }, [rankingTop3, championCarousel, carouselStarted]);
 
-  // ========== ON REFRESH ==========
   const onRefresh = () => {
     console.log('🔄 Pull to refresh...');
     stopCarousel();
@@ -985,7 +1004,6 @@ export default function DashboardScreen() {
     );
   };
 
-  // Renderizar indicadores do carrossel
   const renderCarouselIndicators = () => {
     if (championCarousel.length <= 1) return null;
 
@@ -1004,7 +1022,6 @@ export default function DashboardScreen() {
     );
   };
 
-  // Renderizar ranking
   const renderRanking = () => {
     if (rankingTop3.length === 0) {
       return (
@@ -1104,9 +1121,11 @@ export default function DashboardScreen() {
       }
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
+      {/* ========== HEADER COM LOGO IGUAL AO APP.TSX ========== */}
       <View style={styles.header}>
-        <View>
+        <LogoTitle />
+
+        <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>📊 Dashboard</Text>
           <Text style={styles.headerSubtitle}>
             {new Date().toLocaleDateString('pt-BR', { 
@@ -1116,12 +1135,15 @@ export default function DashboardScreen() {
             })}
           </Text>
           <Text style={styles.headerUpdate}>
-            🕐 Última atualização: {lastUpdate}
+            🕐 {lastUpdate}
           </Text>
         </View>
-        <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
-          <Text style={{ fontSize: 22 }}>🔄</Text>
-        </TouchableOpacity>
+
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
+            <Text style={{ fontSize: 18 }}>🔄</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Stats Grid */}

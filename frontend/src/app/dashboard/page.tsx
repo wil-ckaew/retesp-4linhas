@@ -10,8 +10,9 @@ import {
   Tooltip, ResponsiveContainer, BarChart, Bar,
   PieChart, Pie, Cell, Legend
 } from "recharts";
+import { API_BASE_URL } from "@/lib/config";
 
-const API_BASE = "http://localhost:8081";
+const API_BASE = API_BASE_URL;
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
