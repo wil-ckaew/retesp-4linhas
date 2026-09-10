@@ -13,7 +13,7 @@ export default function CreateTeamPage() {
 
   const onSubmit = async (data: TeamFormData) => {
     try {
-      const res = await fetch("http://localhost:8081/teams", {
+      const res = await fetch("http://192.168.100.105:8081/teams", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

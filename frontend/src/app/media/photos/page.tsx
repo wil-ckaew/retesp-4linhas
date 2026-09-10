@@ -16,7 +16,7 @@ export default function PhotosPage() {
   useEffect(() => {
     const fetchPhotos = async () => {
       try {
-        const res = await fetch("http://localhost:8081/media/photos?_t=" + Date.now());
+        const res = await fetch("http://192.168.100.105:8081/media/photos?_t=" + Date.now());
         if (!res.ok) throw new Error("Erro ao carregar fotos");
         const data = await res.json();
         if (Array.isArray(data)) setPhotos(data);
@@ -46,7 +46,7 @@ export default function PhotosPage() {
               <div key={item.id} className="bg-[#161B22] border border-[#30363D] rounded-2xl overflow-hidden">
                 <div className="relative aspect-square bg-[#0D1117]">
                   <img 
-                    src={`http://localhost:8081${item.file_url}`} 
+                    src={`http://192.168.100.105:8081${item.file_url}`} 
                     alt={`Foto de ${item.athlete_name}`} 
                     className="w-full h-full object-cover"
                   />

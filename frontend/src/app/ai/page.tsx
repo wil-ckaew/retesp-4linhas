@@ -17,7 +17,7 @@ export default function AIPage() {
   const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [apiUrl, setApiUrl] = useState('');
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.100.105:8081';
 
   useEffect(() => {
     setApiUrl(API_URL);

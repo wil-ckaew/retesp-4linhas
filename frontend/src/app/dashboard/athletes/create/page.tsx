@@ -61,7 +61,7 @@ export default function CreateAthletePage() {
     formDataUpload.append("athlete_id", "00000000-0000-0000-0000-000000000000");
 
     try {
-      const res = await fetch("http://localhost:8081/upload", {
+      const res = await fetch("http://192.168.100.105:8081/upload", {
         method: "POST",
         body: formDataUpload,
       });
@@ -112,7 +112,7 @@ export default function CreateAthletePage() {
     formDataUpload.append("athlete_id", "00000000-0000-0000-0000-000000000000");
 
     try {
-      const res = await fetch("http://localhost:8081/upload", {
+      const res = await fetch("http://192.168.100.105:8081/upload", {
         method: "POST",
         body: formDataUpload,
       });
@@ -172,7 +172,7 @@ export default function CreateAthletePage() {
 
       console.log("📤 Enviando dados:", payload);
 
-      const res = await fetch("http://localhost:8081/athletes", {
+      const res = await fetch("http://192.168.100.105:8081/athletes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -258,7 +258,7 @@ export default function CreateAthletePage() {
             {avatarUrl && (
               <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-blue-500">
                 <img 
-                  src={`http://localhost:8081${avatarUrl}`} 
+                  src={`http://192.168.100.105:8081${avatarUrl}`} 
                   alt="Avatar" 
                   className="w-full h-full object-cover"
                 />
@@ -495,7 +495,7 @@ export default function CreateAthletePage() {
 
             {medicalFormUrl && (
               <a
-                href={`http://localhost:8081${medicalFormUrl}`}
+                href={`http://192.168.100.105:8081${medicalFormUrl}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300 text-sm underline flex items-center gap-1"

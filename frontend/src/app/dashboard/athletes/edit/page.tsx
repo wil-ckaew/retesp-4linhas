@@ -61,7 +61,7 @@ export default function EditAthletePage({ params }: { params: { id: string } }) 
 
   const fetchAthlete = async () => {
     try {
-      const res = await fetch(`http://localhost:8081/athletes/${id}?_t=${Date.now()}`);
+      const res = await fetch(`http://192.168.100.105:8081/athletes/${id}?_t=${Date.now()}`);
       if (res.ok) {
         const data: Athlete = await res.json();
         console.log("📥 Dados do atleta:", data);
@@ -120,7 +120,7 @@ export default function EditAthletePage({ params }: { params: { id: string } }) 
     formDataUpload.append("athlete_id", id);
 
     try {
-      const res = await fetch("http://localhost:8081/upload", {
+      const res = await fetch("http://192.168.100.105:8081/upload", {
         method: "POST",
         body: formDataUpload,
       });
@@ -171,7 +171,7 @@ export default function EditAthletePage({ params }: { params: { id: string } }) 
     formDataUpload.append("athlete_id", id);
 
     try {
-      const res = await fetch("http://localhost:8081/upload", {
+      const res = await fetch("http://192.168.100.105:8081/upload", {
         method: "POST",
         body: formDataUpload,
       });
@@ -230,7 +230,7 @@ export default function EditAthletePage({ params }: { params: { id: string } }) 
 
       console.log("📤 Atualizando dados:", payload);
 
-      const res = await fetch(`http://localhost:8081/athletes/${id}`, {
+      const res = await fetch(`http://192.168.100.105:8081/athletes/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -260,7 +260,7 @@ export default function EditAthletePage({ params }: { params: { id: string } }) 
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url;
     }
-    return `http://localhost:8081${url}`;
+    return `http://192.168.100.105:8081${url}`;
   };
 
   return (

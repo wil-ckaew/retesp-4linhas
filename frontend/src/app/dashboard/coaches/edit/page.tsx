@@ -20,7 +20,7 @@ function EditCoachForm() {
     if (!id) { alert("ID não encontrado."); router.push("/dashboard/coaches"); return; }
     const fetchCoach = async () => {
       try {
-        const res = await fetch(`http://localhost:8081/coaches/${id}`);
+        const res = await fetch(`http://192.168.100.105:8081/coaches/${id}`);
         if (!res.ok) throw new Error("Erro ao carregar");
         const data = await res.json();
         setValue("name", data.name);
@@ -34,7 +34,7 @@ function EditCoachForm() {
 
   const onSubmit = async (data: CoachFormData) => {
     try {
-      const res = await fetch(`http://localhost:8081/coaches/${id}`, {
+      const res = await fetch(`http://192.168.100.105:8081/coaches/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

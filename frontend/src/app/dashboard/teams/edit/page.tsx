@@ -19,7 +19,7 @@ function EditTeamForm() {
     if (!id) { alert("ID não encontrado."); router.push("/dashboard/teams"); return; }
     const fetchTeam = async () => {
       try {
-        const res = await fetch(`http://localhost:8081/teams/${id}`);
+        const res = await fetch(`http://192.168.100.105:8081/teams/${id}`);
         if (!res.ok) throw new Error("Erro ao carregar");
         const data = await res.json();
         setValue("name", data.name);
@@ -32,7 +32,7 @@ function EditTeamForm() {
 
   const onSubmit = async (data: TeamFormData) => {
     try {
-      const res = await fetch(`http://localhost:8081/teams/${id}`, {
+      const res = await fetch(`http://192.168.100.105:8081/teams/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

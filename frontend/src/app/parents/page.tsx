@@ -31,20 +31,23 @@ export default function ParentsPage() {
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
 
+  // Usar variável de ambiente para a URL da API
+  const API_URL = "http://192.168.100.105:8081";
+
   // Carregar lista de atletas
   useEffect(() => {
-    fetch("http://localhost:8081/athletes?_t=" + Date.now())
+    fetch(`${API_URL}/athletes?_t=${Date.now()}`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setAthletes(data);
       })
       .catch(err => console.error("Erro ao carregar atletas:", err));
-  }, []);
+  }, [API_URL]);
 
   // Carregar dados do atleta selecionado
   const loadAthleteData = async (athleteId: string) => {
@@ -52,15 +55,15 @@ export default function ParentsPage() {
     setLoading(true);
     try {
       const [summaryRes, mediaRes] = await Promise.all([
-        fetch(`http://localhost:8081/parents/summary/${athleteId}?_t=` + Date.now()),
-        fetch(`http://localhost:8081/parents/media/${athleteId}?_t=` + Date.now())
+        fetch(`${API_URL}/parents/summary/${athleteId}?_t=${Date.now()}`),
+        fetch(`${API_URL}/parents/media/${athleteId}?_t=${Date.now()}`)
       ]);
-      
+
       if (summaryRes.ok) {
         const summaryData = await summaryRes.json();
         setSummary(summaryData);
       }
-      
+
       if (mediaRes.ok) {
         const mediaData = await mediaRes.json();
         if (Array.isArray(mediaData)) setMediaList(mediaData);
@@ -87,12 +90,12 @@ export default function ParentsPage() {
     formData.append("athlete_id", selectedAthleteId);
 
     try {
-      const res = await fetch("http://localhost:8081/upload", {
+      const res = await fetch(`${API_URL}/upload`, {
         method: "POST",
         body: formData,
       });
       if (res.ok) {
-        const mediaRes = await fetch(`http://localhost:8081/parents/media/${selectedAthleteId}?_t=` + Date.now());
+        const mediaRes = await fetch(`${API_URL}/parents/media/${selectedAthleteId}?_t=${Date.now()}`);
         if (mediaRes.ok) {
           const mediaData = await mediaRes.json();
           if (Array.isArray(mediaData)) setMediaList(mediaData);
@@ -115,11 +118,11 @@ export default function ParentsPage() {
   const deleteMedia = async (id: string, fileName: string) => {
     if (!confirm(`Tem certeza que deseja excluir o arquivo "${fileName}"?`)) return;
     try {
-      const res = await fetch(`http://localhost:8081/media/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_URL}/media/${id}`, { method: "DELETE" });
       if (res.ok) {
         alert("Arquivo excluído com sucesso!");
         // Recarregar a lista
-        const mediaRes = await fetch(`http://localhost:8081/parents/media/${selectedAthleteId}?_t=` + Date.now());
+        const mediaRes = await fetch(`${API_URL}/parents/media/${selectedAthleteId}?_t=${Date.now()}`);
         if (mediaRes.ok) {
           const mediaData = await mediaRes.json();
           if (Array.isArray(mediaData)) setMediaList(mediaData);
@@ -141,7 +144,7 @@ export default function ParentsPage() {
       return;
     }
     try {
-      const res = await fetch(`http://localhost:8081/media/${id}`, {
+      const res = await fetch(`${API_URL}/media/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ new_name: newName }),
@@ -151,7 +154,7 @@ export default function ParentsPage() {
         setEditingId(null);
         setNewName("");
         // Recarregar a lista
-        const mediaRes = await fetch(`http://localhost:8081/parents/media/${selectedAthleteId}?_t=` + Date.now());
+        const mediaRes = await fetch(`${API_URL}/parents/media/${selectedAthleteId}?_t=${Date.now()}`);
         if (mediaRes.ok) {
           const mediaData = await mediaRes.json();
           if (Array.isArray(mediaData)) setMediaList(mediaData);
@@ -196,7 +199,7 @@ export default function ParentsPage() {
                 <div className="bg-[#161B22] border border-[#30363D] rounded-2xl p-6">
                   <div className="flex items-center gap-4 mb-4">
                     {summary?.avatar_url ? (
-                      <img src={`http://localhost:8081${summary.avatar_url}`} alt={summary.name} className="w-16 h-16 rounded-full object-cover border-2 border-blue-500" />
+                      <img src={`${API_URL}${summary.avatar_url}`} alt={summary.name} className="w-16 h-16 rounded-full object-cover border-2 border-blue-500" />
                     ) : (
                       <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-2xl">{summary?.name?.charAt(0) || "👤"}</div>
                     )}
@@ -213,7 +216,7 @@ export default function ParentsPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="bg-[#161B22] border border-[#30363D] rounded-2xl p-6">
                   <h3 className="text-lg font-bold mb-4">🏆 Evolução</h3>
                   <div className="bg-green-600/10 p-4 rounded-lg border border-green-500/30 inline-block">
@@ -253,14 +256,14 @@ export default function ParentsPage() {
                     {mediaList.map((item) => (
                       <div key={item.id} className="bg-[#0D1117] border border-[#21262D] rounded-lg overflow-hidden group relative">
                         {item.media_type === "photo" ? (
-                          <img 
-                            src={`http://localhost:8081${item.file_url}`} 
-                            alt="Foto" 
+                          <img
+                            src={`${API_URL}${item.file_url}`}
+                            alt="Foto"
                             className="w-full h-40 object-cover hover:scale-105 transition-transform duration-200"
                           />
                         ) : (
-                          <video 
-                            src={`http://localhost:8081${item.file_url}`} 
+                          <video
+                            src={`${API_URL}${item.file_url}`}
                             className="w-full h-40 object-cover"
                             controls
                           />
@@ -268,10 +271,10 @@ export default function ParentsPage() {
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
                           <p className="text-xs text-gray-300">{new Date(item.uploaded_at).toLocaleDateString()}</p>
                         </div>
-                        
+
                         {/* Botões de Editar e Excluir */}
                         <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               const fileName = item.file_url.split('/').pop() || 'arquivo';
@@ -282,7 +285,7 @@ export default function ParentsPage() {
                           >
                             ✎
                           </button>
-                          <button 
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               const fileName = item.file_url.split('/').pop() || 'arquivo';
@@ -298,22 +301,22 @@ export default function ParentsPage() {
                         {editingId === item.id && (
                           <div className="absolute inset-0 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm z-10">
                             <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-4 w-full max-w-xs">
-                              <input 
-                                type="text" 
-                                value={newName} 
+                              <input
+                                type="text"
+                                value={newName}
                                 onChange={(e) => setNewName(e.target.value)}
                                 className="w-full bg-[#0D1117] border border-[#30363D] rounded p-2 text-white mb-2"
                                 placeholder="Novo nome"
                                 autoFocus
                               />
                               <div className="flex gap-2">
-                                <button 
+                                <button
                                   onClick={() => renameMedia(item.id)}
                                   className="flex-1 bg-blue-600 hover:bg-blue-700 py-1.5 rounded text-sm"
                                 >
                                   Salvar
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => {
                                     setEditingId(null);
                                     setNewName("");

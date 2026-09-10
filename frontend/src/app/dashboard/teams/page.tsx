@@ -15,7 +15,7 @@ export default function TeamsPage() {
 
   const fetchTeams = async () => {
     try {
-      const res = await fetch("http://localhost:8081/teams?_t=" + Date.now());
+      const res = await fetch("http://192.168.100.105:8081/teams?_t=" + Date.now());
       if (!res.ok) throw new Error("Erro na requisição");
       const data = await res.json();
       if (Array.isArray(data)) setTeams(data);
@@ -25,7 +25,7 @@ export default function TeamsPage() {
   const deleteTeam = async (id: string, name: string) => {
     if (!confirm(`Tem certeza que deseja excluir a turma "${name}"?`)) return;
     try {
-      const res = await fetch(`http://localhost:8081/teams/${id}`, { method: "DELETE" });
+      const res = await fetch(`http://192.168.100.105:8081/teams/${id}`, { method: "DELETE" });
       if (res.ok) {
         alert("Turma excluída com sucesso!");
         if (expandedId === id) setExpandedId(null);

@@ -64,7 +64,7 @@ export default function EditAthletePage() {
       if (!id) return;
       
       try {
-        const res = await fetch(`http://localhost:8081/athletes/${id}`, {
+        const res = await fetch(`http://192.168.100.105:8081/athletes/${id}`, {
           headers: {
             'Cache-Control': 'no-cache'
           }
@@ -124,7 +124,7 @@ export default function EditAthletePage() {
     formDataUpload.append("athlete_id", id || "00000000-0000-0000-0000-000000000000");
 
     try {
-      const res = await fetch("http://localhost:8081/upload", {
+      const res = await fetch("http://192.168.100.105:8081/upload", {
         method: "POST",
         body: formDataUpload,
       });
@@ -175,7 +175,7 @@ export default function EditAthletePage() {
     formDataUpload.append("athlete_id", id || "00000000-0000-0000-0000-000000000000");
 
     try {
-      const res = await fetch("http://localhost:8081/upload", {
+      const res = await fetch("http://192.168.100.105:8081/upload", {
         method: "POST",
         body: formDataUpload,
       });
@@ -224,7 +224,7 @@ export default function EditAthletePage() {
         medical_form_url: medicalFormUrl,
       };
 
-      const res = await fetch(`http://localhost:8081/athletes/${id}`, {
+      const res = await fetch(`http://192.168.100.105:8081/athletes/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -250,7 +250,7 @@ export default function EditAthletePage() {
     if (!confirm("Tem certeza que deseja excluir este atleta?")) return;
     
     try {
-      const res = await fetch(`http://localhost:8081/athletes/${id}`, {
+      const res = await fetch(`http://192.168.100.105:8081/athletes/${id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -304,7 +304,7 @@ export default function EditAthletePage() {
             {(currentAvatarUrl || avatarUrl) && !avatarFile && (
               <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-blue-500 flex-shrink-0">
                 <img 
-                  src={`http://localhost:8081${avatarUrl || currentAvatarUrl}`} 
+                  src={`http://192.168.100.105:8081${avatarUrl || currentAvatarUrl}`} 
                   alt="Avatar" 
                   className="w-full h-full object-cover"
                 />
@@ -414,7 +414,7 @@ export default function EditAthletePage() {
             {/* Mostrar PDF atual */}
             {currentMedicalFormUrl && !medicalFormFile && (
               <a
-                href={`http://localhost:8081${currentMedicalFormUrl}`}
+                href={`http://192.168.100.105:8081${currentMedicalFormUrl}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-1 bg-green-600/20 text-green-400 border border-green-600/30 rounded-lg text-sm"
@@ -469,7 +469,7 @@ export default function EditAthletePage() {
 
             {medicalFormUrl && !medicalFormFile && (
               <a
-                href={`http://localhost:8081${medicalFormUrl}`}
+                href={`http://192.168.100.105:8081${medicalFormUrl}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300 text-sm underline flex items-center gap-1"

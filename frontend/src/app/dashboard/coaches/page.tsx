@@ -16,7 +16,7 @@ export default function CoachesPage() {
 
   const fetchCoaches = async () => {
     try {
-      const res = await fetch("http://localhost:8081/coaches?_t=" + Date.now());
+      const res = await fetch("http://192.168.100.105:8081/coaches?_t=" + Date.now());
       if (!res.ok) throw new Error("Erro na requisição");
       const data = await res.json();
       if (Array.isArray(data)) setCoaches(data);
@@ -26,7 +26,7 @@ export default function CoachesPage() {
   const deleteCoach = async (id: string, name: string) => {
     if (!confirm(`Tem certeza que deseja excluir o professor "${name}"?`)) return;
     try {
-      const res = await fetch(`http://localhost:8081/coaches/${id}`, { method: "DELETE" });
+      const res = await fetch(`http://192.168.100.105:8081/coaches/${id}`, { method: "DELETE" });
       if (res.ok) {
         alert("Professor excluído com sucesso!");
         if (expandedId === id) setExpandedId(null);

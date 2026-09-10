@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, Clock, Users, Target, Edit, Trash2 } from "lucide-react";
 
-const API_BASE = "http://localhost:8081";
+const API_BASE = "http://192.168.100.105:8081";
 
 type Training = {
   id: string;

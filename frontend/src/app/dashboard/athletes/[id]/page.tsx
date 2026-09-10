@@ -54,7 +54,7 @@ export default function AthleteDetailsPage() {
       if (!id) return;
       
       try {
-        const res = await fetch(`http://localhost:8081/athletes/${id}`);
+        const res = await fetch(`http://192.168.100.105:8081/athletes/${id}`);
         if (res.ok) {
           const data = await res.json();
           setAthlete(data);
@@ -80,7 +80,7 @@ export default function AthleteDetailsPage() {
     
     setAttendanceLoading(true);
     try {
-      const res = await fetch(`http://localhost:8081/attendance/athlete/${id}`);
+      const res = await fetch(`http://192.168.100.105:8081/attendance/athlete/${id}`);
       if (res.ok) {
         const data = await res.json();
         console.log("Dados de presença:", data);
@@ -101,7 +101,7 @@ export default function AthleteDetailsPage() {
     if (!confirm("Tem certeza que deseja excluir este atleta?")) return;
     
     try {
-      const res = await fetch(`http://localhost:8081/athletes/${id}`, {
+      const res = await fetch(`http://192.168.100.105:8081/athletes/${id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -182,7 +182,7 @@ export default function AthleteDetailsPage() {
           <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-blue-500 flex-shrink-0">
             {athlete.avatar_url ? (
               <img 
-                src={`http://localhost:8081${athlete.avatar_url}`} 
+                src={`http://192.168.100.105:8081${athlete.avatar_url}`} 
                 alt={athlete.name}
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -288,7 +288,7 @@ export default function AthleteDetailsPage() {
                 </div>
                 {athlete.medical_form_url && (
                   <a
-                    href={`http://localhost:8081${athlete.medical_form_url}`}
+                    href={`http://192.168.100.105:8081${athlete.medical_form_url}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition text-sm"
@@ -311,7 +311,7 @@ export default function AthleteDetailsPage() {
                 </div>
                 {athlete.avatar_url && (
                   <a
-                    href={`http://localhost:8081${athlete.avatar_url}`}
+                    href={`http://192.168.100.105:8081${athlete.avatar_url}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition text-sm"

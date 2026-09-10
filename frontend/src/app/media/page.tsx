@@ -21,8 +21,8 @@ export default function MediaPage() {
   const fetchMedia = async () => {
     try {
       const [photosRes, videosRes] = await Promise.all([
-        fetch("http://localhost:8081/media/photos"),
-        fetch("http://localhost:8081/media/videos"),
+        fetch("http://192.168.100.105:8081/media/photos"),
+        fetch("http://192.168.100.105:8081/media/videos"),
       ]);
 
       const photosData = await photosRes.json();
@@ -125,7 +125,7 @@ export default function MediaPage() {
               <div className="relative aspect-square bg-[#0D1117] overflow-hidden">
                 {item.media_type === "photo" ? (
                   <img
-                    src={`http://localhost:8081${item.file_url}`}
+                    src={`http://192.168.100.105:8081${item.file_url}`}
                     alt={item.athlete_name || "Foto"}
                     className="w-full h-full object-cover"
                   />
@@ -177,13 +177,13 @@ export default function MediaPage() {
             <div className="aspect-video bg-[#0D1117] flex items-center justify-center">
               {selectedMedia.media_type === "photo" ? (
                 <img
-                  src={`http://localhost:8081${selectedMedia.file_url}`}
+                  src={`http://192.168.100.105:8081${selectedMedia.file_url}`}
                   alt={selectedMedia.athlete_name || "Foto"}
                   className="w-full h-full object-contain"
                 />
               ) : (
                 <video
-                  src={`http://localhost:8081${selectedMedia.file_url}`}
+                  src={`http://192.168.100.105:8081${selectedMedia.file_url}`}
                   className="w-full h-full"
                   controls
                   autoPlay
@@ -201,7 +201,7 @@ export default function MediaPage() {
                 </p>
               </div>
               <a
-                href={`http://localhost:8081${selectedMedia.file_url}`}
+                href={`http://192.168.100.105:8081${selectedMedia.file_url}`}
                 download
                 target="_blank"
                 rel="noopener noreferrer"

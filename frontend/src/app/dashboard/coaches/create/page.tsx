@@ -14,7 +14,7 @@ export default function CreateCoachPage() {
 
   const onSubmit = async (data: CoachFormData) => {
     try {
-      const res = await fetch("http://localhost:8081/coaches", {
+      const res = await fetch("http://192.168.100.105:8081/coaches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

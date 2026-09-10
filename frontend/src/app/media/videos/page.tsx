@@ -51,7 +51,7 @@ export default function VideosPage() {
 
   const fetchVideos = async () => {
     try {
-      const res = await fetch("http://localhost:8081/media/videos?_t=" + Date.now());
+      const res = await fetch("http://192.168.100.105:8081/media/videos?_t=" + Date.now());
       if (!res.ok) throw new Error("Erro ao carregar vídeos");
       const data = await res.json();
       if (Array.isArray(data)) setVideos(data);
@@ -62,7 +62,7 @@ export default function VideosPage() {
 
   const fetchAthletes = async () => {
     try {
-      const res = await fetch("http://localhost:8081/athletes?_t=" + Date.now());
+      const res = await fetch("http://192.168.100.105:8081/athletes?_t=" + Date.now());
       if (res.ok) {
         const data = await res.json();
         setAthletes(data);
@@ -147,7 +147,7 @@ export default function VideosPage() {
           }
         };
         xhr.onerror = () => reject(new Error("Erro de conexão"));
-        xhr.open("POST", "http://localhost:8081/upload"); // ROTA CORRETA
+        xhr.open("POST", "http://192.168.100.105:8081/upload"); // ROTA CORRETA
         xhr.send(formData);
       });
 
@@ -190,7 +190,7 @@ export default function VideosPage() {
   const deleteVideo = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este vídeo?")) return;
     try {
-      const res = await fetch(`http://localhost:8081/media/${id}`, {
+      const res = await fetch(`http://192.168.100.105:8081/media/${id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -289,7 +289,7 @@ export default function VideosPage() {
                 >
                   <div className="relative aspect-video bg-[#0D1117]">
                     <video 
-                      src={`http://localhost:8081${item.file_url}`} 
+                      src={`http://192.168.100.105:8081${item.file_url}`} 
                       className="w-full h-full object-cover"
                       controls
                       preload="metadata"
