@@ -11,6 +11,7 @@ import {
   Dimensions,
   Image,
   Animated,
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { API_URL } from '../services/api';
@@ -53,16 +54,16 @@ interface RankingAthlete {
   perfect_attendance: boolean;
 }
 
-// ========== COMPONENTE DE LOGO IGUAL AO APP.TSX ==========
+// ========== COMPONENTE DE LOGO ==========
 function LogoTitle() {
   const { colors } = useTheme();
-  
+
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <View style={{ 
-        width: 40, 
-        height: 40, 
-        borderRadius: 10, 
+      <View style={{
+        width: 40,
+        height: 40,
+        borderRadius: 10,
         overflow: 'hidden',
         backgroundColor: colors.card,
         justifyContent: 'center',
@@ -71,8 +72,8 @@ function LogoTitle() {
         borderColor: colors.border,
         padding: 4,
       }}>
-        <Image 
-          source={require('../../assets/logo.png')} 
+        <Image
+          source={require('../../assets/logo.png')}
           style={{ width: 32, height: 32 }}
           resizeMode="contain"
         />
@@ -89,10 +90,103 @@ function LogoTitle() {
   );
 }
 
+// ========== FALLBACK DE GRÁFICO PARA WEB ==========
+function WebLineChartFallback({ data }: { data: { labels: string[]; datasets: { data: number[] }[] } }) {
+  const values = data.datasets[0]?.data || [];
+  const maxValue = Math.max(...values, 1);
+
+  return (
+    <View style={{ padding: 12, backgroundColor: '#0D1117', borderRadius: 8, width: '100%' }}>
+      {data.labels.map((label, index) => {
+        const value = values[index] || 0;
+        const percent = (value / maxValue) * 100;
+        return (
+          <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 6 }}>
+            <Text style={{ color: '#8B949E', width: 40, fontSize: 12 }}>{label}</Text>
+            <View style={{ flex: 1, height: 12, backgroundColor: '#21262D', borderRadius: 6, overflow: 'hidden' }}>
+              <View
+                style={{
+                  height: 12,
+                  width: `${percent}%`,
+                  backgroundColor: '#3B82F6',
+                  borderRadius: 6,
+                }}
+              />
+            </View>
+            <Text style={{ color: '#3B82F6', width: 40, textAlign: 'right', fontSize: 12 }}>
+              {Math.round(value)}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function WebBarChartFallback({ data }: { data: { labels: string[]; datasets: { data: number[] }[] } }) {
+  const values = data.datasets[0]?.data || [];
+  const maxValue = Math.max(...values, 1);
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', height: 200, padding: 12, backgroundColor: '#0D1117', borderRadius: 8, width: '100%' }}>
+      {data.labels.map((label, index) => {
+        const value = values[index] || 0;
+        const height = (value / maxValue) * 160;
+        return (
+          <View key={index} style={{ alignItems: 'center', flex: 1 }}>
+            <Text style={{ color: '#3B82F6', fontSize: 12, marginBottom: 4 }}>{value}</Text>
+            <View
+              style={{
+                width: '60%',
+                height: Math.max(height, 4),
+                backgroundColor: '#3B82F6',
+                borderRadius: 4,
+              }}
+            />
+            <Text style={{ color: '#8B949E', fontSize: 10, marginTop: 4 }}>{label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function WebPieChartFallback({ data }: { data: { name: string; population: number; color: string }[] }) {
+  const total = data.reduce((sum, item) => sum + item.population, 0) || 1;
+
+  return (
+    <View style={{ padding: 12, backgroundColor: '#0D1117', borderRadius: 8, width: '100%' }}>
+      {data.map((item, index) => {
+        const percent = (item.population / total) * 100;
+        return (
+          <View key={index} style={{ marginVertical: 6 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={{ color: '#FFF', fontSize: 12 }}>{item.name}</Text>
+              <Text style={{ color: item.color, fontSize: 12, fontWeight: 'bold' }}>
+                {item.population} ({percent.toFixed(0)}%)
+              </Text>
+            </View>
+            <View style={{ height: 10, backgroundColor: '#21262D', borderRadius: 5, overflow: 'hidden' }}>
+              <View
+                style={{
+                  height: 10,
+                  width: `${percent}%`,
+                  backgroundColor: item.color,
+                  borderRadius: 5,
+                }}
+              />
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
   const { colors, isDark } = useTheme();
-  
+
   const [stats, setStats] = useState<DashboardStats>({
     totalAthletes: 0,
     presentToday: 0,
@@ -115,7 +209,6 @@ export default function DashboardScreen() {
   const [showChampionCarousel, setShowChampionCarousel] = useState(false);
   const [carouselStarted, setCarouselStarted] = useState(false);
 
-  // Animações - SEM useNativeDriver para compatibilidade mobile
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -147,538 +240,118 @@ export default function DashboardScreen() {
   };
 
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    centered: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: colors.background,
-      padding: 20,
-    },
-    loadingText: {
-      color: colors.textSecondary,
-      marginTop: 12,
-    },
-    errorText: {
-      color: colors.danger || '#EF4444',
-      marginTop: 12,
-      textAlign: 'center',
-    },
-    errorSubtext: {
-      color: colors.textSecondary,
-      marginTop: 4,
-      fontSize: 12,
-    },
-    retryButton: {
-      marginTop: 16,
-      backgroundColor: colors.primary || '#3B82F6',
-      paddingHorizontal: 24,
-      paddingVertical: 12,
-      borderRadius: 12,
-    },
-    retryButtonText: {
-      color: '#FFFFFF',
-      fontWeight: '600',
-    },
-    // ========== HEADER COM LOGO IGUAL AO APP.TSX ==========
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingTop: 12,
-      paddingBottom: 8,
-    },
-    headerCenter: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: colors.text,
-    },
-    headerSubtitle: {
-      fontSize: 12,
-      color: colors.textSecondary,
-    },
-    headerUpdate: {
-      fontSize: 10,
-      color: colors.textSecondary,
-    },
-    headerRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    refreshButton: {
-      padding: 8,
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    statsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      paddingHorizontal: 8,
-      gap: 8,
-    },
-    statCard: {
-      width: (width - 40) / 2,
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    statCardHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 4,
-    },
-    statIcon: {
-      padding: 8,
-      borderRadius: 10,
-    },
-    statValue: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: colors.text,
-    },
-    statTitle: {
-      fontSize: 12,
-      color: colors.textSecondary,
-    },
-    statSubtitle: {
-      fontSize: 10,
-      color: colors.textSecondary,
-      marginTop: 2,
-    },
-    chartCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 16,
-      marginHorizontal: 16,
-      marginTop: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    chartTitle: {
-      color: colors.text,
-      fontSize: 16,
-      fontWeight: '600',
-      marginBottom: 12,
-    },
-    chart: {
-      borderRadius: 16,
-      marginVertical: 8,
-    },
-    lineChartContainer: {
-      alignItems: 'flex-start',
-      justifyContent: 'center',
-      overflow: 'hidden',
-      marginHorizontal: -12,
-    },
-    barChartContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      overflow: 'hidden',
-      marginHorizontal: -12,
-    },
-    progressCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 16,
-      marginHorizontal: 16,
-      marginTop: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    progressHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    progressTitle: {
-      color: colors.textSecondary,
-      fontSize: 14,
-    },
-    progressValue: {
-      color: colors.primary || '#3B82F6',
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    progressBar: {
-      height: 8,
-      backgroundColor: colors.hover || '#21262D',
-      borderRadius: 4,
-      overflow: 'hidden',
-    },
-    progressFill: {
-      height: '100%',
-      backgroundColor: colors.primary || '#3B82F6',
-      borderRadius: 4,
-    },
-    progressStats: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: 8,
-    },
-    progressStat: {
-      color: colors.textSecondary,
-      fontSize: 12,
-    },
-    rankingCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 16,
-      marginHorizontal: 16,
-      marginTop: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      overflow: 'hidden',
-    },
-    rankingTitle: {
-      color: colors.text,
-      fontSize: 16,
-      fontWeight: '600',
-      marginBottom: 12,
-    },
-    rankingHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 12,
-    },
-    rankingSeeAll: {
-      color: colors.primary || '#3B82F6',
-      fontSize: 13,
-    },
-    championCarouselContainer: {
-      height: 120,
-      marginBottom: 12,
-      overflow: 'hidden',
-    },
-    championCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.primary + '15',
-      borderRadius: 12,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: colors.primary + '30',
-      height: 120,
-    },
-    championAvatar: {
-      width: 70,
-      height: 70,
-      borderRadius: 35,
-      backgroundColor: colors.primary || '#3B82F6',
-      justifyContent: 'center',
-      alignItems: 'center',
-      overflow: 'hidden',
-      borderWidth: 3,
-      borderColor: '#F59E0B',
-    },
-    championAvatarImage: {
-      width: 70,
-      height: 70,
-      borderRadius: 35,
-      resizeMode: 'cover',
-    },
-    championAvatarText: {
-      color: '#FFFFFF',
-      fontSize: 28,
-      fontWeight: 'bold',
-    },
-    championInfo: {
-      flex: 1,
-      marginLeft: 12,
-    },
-    championName: {
-      color: colors.text,
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    championCategory: {
-      color: colors.textSecondary,
-      fontSize: 13,
-    },
-    championBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#F59E0B',
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 12,
-      marginTop: 4,
-      alignSelf: 'flex-start',
-    },
-    championBadgeText: {
-      color: '#FFFFFF',
-      fontSize: 10,
-      fontWeight: 'bold',
-    },
-    championStats: {
-      alignItems: 'flex-end',
-    },
-    championPoints: {
-      color: '#10B981',
-      fontSize: 20,
-      fontWeight: 'bold',
-    },
-    championAttendance: {
-      color: colors.textSecondary,
-      fontSize: 12,
-    },
-    carouselIndicators: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginTop: 8,
-      gap: 8,
-    },
-    indicatorDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.border,
-    },
-    indicatorDotActive: {
-      width: 24,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.primary || '#3B82F6',
-    },
-    rankingList: {
-      marginTop: 4,
-    },
-    rankingItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 8,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    rankingItemLast: {
-      borderBottomWidth: 0,
-    },
-    rankingPosition: {
-      width: 30,
-      fontSize: 14,
-      fontWeight: 'bold',
-      color: colors.textSecondary,
-      textAlign: 'center',
-    },
-    rankingPositionGold: {
-      color: '#F59E0B',
-    },
-    rankingAvatar: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: colors.primary || '#3B82F6',
-      justifyContent: 'center',
-      alignItems: 'center',
-      overflow: 'hidden',
-      marginHorizontal: 10,
-    },
-    rankingAvatarImage: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      resizeMode: 'cover',
-    },
-    rankingAvatarText: {
-      color: '#FFFFFF',
-      fontSize: 12,
-      fontWeight: 'bold',
-    },
-    rankingName: {
-      flex: 1,
-      color: colors.text,
-      fontSize: 13,
-      fontWeight: '500',
-    },
-    rankingPercent: {
-      fontSize: 13,
-      fontWeight: 'bold',
-      color: '#10B981',
-    },
-    summaryCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 16,
-      marginHorizontal: 16,
-      marginTop: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    summaryTitle: {
-      color: colors.text,
-      fontSize: 16,
-      fontWeight: '600',
-      marginBottom: 12,
-    },
-    summaryGrid: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-    },
-    summaryItem: {
-      alignItems: 'center',
-    },
-    summaryValue: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: colors.primary || '#3B82F6',
-    },
-    summaryLabel: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      marginTop: 2,
-    },
-    recentSection: {
-      paddingHorizontal: 16,
-      marginTop: 16,
-    },
-    sectionHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    sectionTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    seeAll: {
-      color: colors.primary || '#3B82F6',
-      fontSize: 13,
-    },
-    athleteItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    athleteAvatar: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.primary || '#3B82F6',
-      justifyContent: 'center',
-      alignItems: 'center',
-      overflow: 'hidden',
-    },
-    athleteAvatarImage: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      resizeMode: 'cover',
-    },
-    athleteAvatarText: {
-      color: '#FFFFFF',
-      fontSize: 16,
-      fontWeight: 'bold',
-    },
-    athleteInfo: {
-      flex: 1,
-      marginLeft: 12,
-    },
-    athleteName: {
-      color: colors.text,
-      fontSize: 14,
-      fontWeight: '500',
-    },
-    athleteCategory: {
-      color: colors.textSecondary,
-      fontSize: 12,
-    },
-    emptyState: {
-      padding: 20,
-      alignItems: 'center',
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    emptyText: {
-      color: colors.textSecondary,
-    },
-    footer: {
-      height: 40,
-    },
+    container: { flex: 1, backgroundColor: colors.background },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background, padding: 20 },
+    loadingText: { color: colors.textSecondary, marginTop: 12 },
+    errorText: { color: colors.danger || '#EF4444', marginTop: 12, textAlign: 'center' },
+    errorSubtext: { color: colors.textSecondary, marginTop: 4, fontSize: 12 },
+    retryButton: { marginTop: 16, backgroundColor: colors.primary || '#3B82F6', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+    retryButtonText: { color: '#FFFFFF', fontWeight: '600' },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+    headerCenter: { flex: 1, alignItems: 'center' },
+    headerTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text },
+    headerSubtitle: { fontSize: 12, color: colors.textSecondary },
+    headerUpdate: { fontSize: 10, color: colors.textSecondary },
+    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    refreshButton: { padding: 8, backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+    statsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8, gap: 8 },
+    statCard: { width: (width - 40) / 2, backgroundColor: colors.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border },
+    statCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+    statIcon: { padding: 8, borderRadius: 10 },
+    statValue: { fontSize: 24, fontWeight: 'bold', color: colors.text },
+    statTitle: { fontSize: 12, color: colors.textSecondary },
+    statSubtitle: { fontSize: 10, color: colors.textSecondary, marginTop: 2 },
+    chartCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderColor: colors.border },
+    chartTitle: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+    chart: { borderRadius: 16, marginVertical: 8 },
+    lineChartContainer: { alignItems: 'flex-start', justifyContent: 'center', overflow: 'hidden', marginHorizontal: -12 },
+    barChartContainer: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginHorizontal: -12 },
+    progressCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderColor: colors.border },
+    progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    progressTitle: { color: colors.textSecondary, fontSize: 14 },
+    progressValue: { color: colors.primary || '#3B82F6', fontSize: 18, fontWeight: 'bold' },
+    progressBar: { height: 8, backgroundColor: colors.hover || '#21262D', borderRadius: 4, overflow: 'hidden' },
+    progressFill: { height: '100%', backgroundColor: colors.primary || '#3B82F6', borderRadius: 4 },
+    progressStats: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+    progressStat: { color: colors.textSecondary, fontSize: 12 },
+    rankingCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+    rankingTitle: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+    rankingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    rankingSeeAll: { color: colors.primary || '#3B82F6', fontSize: 13 },
+    championCarouselContainer: { height: 120, marginBottom: 12, overflow: 'hidden' },
+    championCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary + '15', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.primary + '30', height: 120 },
+    championAvatar: { width: 70, height: 70, borderRadius: 35, backgroundColor: colors.primary || '#3B82F6', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 3, borderColor: '#F59E0B' },
+    championAvatarImage: { width: 70, height: 70, borderRadius: 35, resizeMode: 'cover' },
+    championAvatarText: { color: '#FFFFFF', fontSize: 28, fontWeight: 'bold' },
+    championInfo: { flex: 1, marginLeft: 12 },
+    championName: { color: colors.text, fontSize: 18, fontWeight: 'bold' },
+    championCategory: { color: colors.textSecondary, fontSize: 13 },
+    championBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F59E0B', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, marginTop: 4, alignSelf: 'flex-start' },
+    championBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
+    championStats: { alignItems: 'flex-end' },
+    championPoints: { color: '#10B981', fontSize: 20, fontWeight: 'bold' },
+    championAttendance: { color: colors.textSecondary, fontSize: 12 },
+    carouselIndicators: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 8, gap: 8 },
+    indicatorDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
+    indicatorDotActive: { width: 24, height: 8, borderRadius: 4, backgroundColor: colors.primary || '#3B82F6' },
+    rankingList: { marginTop: 4 },
+    rankingItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+    rankingItemLast: { borderBottomWidth: 0 },
+    rankingPosition: { width: 30, fontSize: 14, fontWeight: 'bold', color: colors.textSecondary, textAlign: 'center' },
+    rankingPositionGold: { color: '#F59E0B' },
+    rankingAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary || '#3B82F6', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginHorizontal: 10 },
+    rankingAvatarImage: { width: 32, height: 32, borderRadius: 16, resizeMode: 'cover' },
+    rankingAvatarText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
+    rankingName: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '500' },
+    rankingPercent: { fontSize: 13, fontWeight: 'bold', color: '#10B981' },
+    summaryCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderColor: colors.border },
+    summaryTitle: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+    summaryGrid: { flexDirection: 'row', justifyContent: 'space-around' },
+    summaryItem: { alignItems: 'center' },
+    summaryValue: { fontSize: 24, fontWeight: 'bold', color: colors.primary || '#3B82F6' },
+    summaryLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    recentSection: { paddingHorizontal: 16, marginTop: 16 },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    sectionTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
+    seeAll: { color: colors.primary || '#3B82F6', fontSize: 13 },
+    athleteItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border },
+    athleteAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary || '#3B82F6', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+    athleteAvatarImage: { width: 40, height: 40, borderRadius: 20, resizeMode: 'cover' },
+    athleteAvatarText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+    athleteInfo: { flex: 1, marginLeft: 12 },
+    athleteName: { color: colors.text, fontSize: 14, fontWeight: '500' },
+    athleteCategory: { color: colors.textSecondary, fontSize: 12 },
+    emptyState: { padding: 20, alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+    emptyText: { color: colors.textSecondary },
+    footer: { height: 40 },
   });
 
-  // ========== FUNÇÃO PARA INICIAR O CARROSSEL ==========
   const startCarousel = useCallback(() => {
     if (carouselInterval.current) {
       clearInterval(carouselInterval.current);
       carouselInterval.current = null;
     }
-
     if (championCarousel.length <= 1) {
       setShowChampionCarousel(false);
       setCarouselStarted(false);
       return;
     }
-
     setShowChampionCarousel(true);
     setCarouselStarted(true);
-
     carouselInterval.current = setInterval(() => {
       Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 0.9,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: -20,
-          duration: 300,
-          useNativeDriver: false,
-        }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: false }),
+        Animated.timing(scaleAnim, { toValue: 0.9, duration: 300, useNativeDriver: false }),
+        Animated.timing(slideAnim, { toValue: -20, duration: 300, useNativeDriver: false }),
       ]).start(() => {
-        setCurrentChampionIndex(prev => 
-          prev === championCarousel.length - 1 ? 0 : prev + 1
-        );
-        
+        setCurrentChampionIndex(prev => prev === championCarousel.length - 1 ? 0 : prev + 1);
         slideAnim.setValue(20);
         scaleAnim.setValue(0.9);
         fadeAnim.setValue(0);
-        
         Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: false,
-          }),
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: false,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: false,
-          }),
+          Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: false }),
+          Animated.timing(scaleAnim, { toValue: 1, duration: 300, useNativeDriver: false }),
+          Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: false }),
         ]).start();
       });
     }, 3000);
@@ -692,32 +365,24 @@ export default function DashboardScreen() {
     setCarouselStarted(false);
   }, []);
 
-  // ========== FETCH DADOS ==========
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
-
       console.log('📡 Buscando dados do dashboard...');
 
       const athletesRes = await fetch(`${API_URL}/athletes?_t=${Date.now()}`);
-      if (!athletesRes.ok) {
-        throw new Error(`Erro ao buscar atletas: ${athletesRes.status}`);
-      }
+      if (!athletesRes.ok) throw new Error(`Erro ao buscar atletas: ${athletesRes.status}`);
       const athletesData = await athletesRes.json();
       console.log('✅ Atletas carregados:', athletesData?.length || 0);
-      
+
       const coachesRes = await fetch(`${API_URL}/coaches?_t=${Date.now()}`);
       let coachesData = [];
-      if (coachesRes.ok) {
-        coachesData = await coachesRes.json();
-      }
-      
+      if (coachesRes.ok) coachesData = await coachesRes.json();
+
       const teamsRes = await fetch(`${API_URL}/teams?_t=${Date.now()}`);
       let teamsData = [];
-      if (teamsRes.ok) {
-        teamsData = await teamsRes.json();
-      }
+      if (teamsRes.ok) teamsData = await teamsRes.json();
 
       const totalAthletes = athletesData?.length || 0;
       const totalCoaches = coachesData?.length || 0;
@@ -726,7 +391,7 @@ export default function DashboardScreen() {
       const today = new Date().toISOString().split('T')[0];
       let presentToday = 0;
       let absentToday = 0;
-      
+
       try {
         const attendanceRes = await fetch(`${API_URL}/attendance/today?date=${today}&_t=${Date.now()}`);
         if (attendanceRes.ok) {
@@ -745,7 +410,6 @@ export default function DashboardScreen() {
       const attendanceRate = totalAthletes > 0 ? (presentToday / totalAthletes) * 100 : 0;
 
       let rankingData: RankingAthlete[] = [];
-      
       try {
         const attendancePromises = athletesData.map(async (athlete: any) => {
           try {
@@ -769,34 +433,19 @@ export default function DashboardScreen() {
               };
             }
             return null;
-          } catch {
-            return null;
-          }
+          } catch { return null; }
         });
 
         const results = await Promise.all(attendancePromises);
         rankingData = results.filter((r): r is RankingAthlete => r !== null);
-        
         rankingData.sort((a, b) => b.points - a.points);
-        rankingData.forEach((item, index) => {
-          item.ranking_position = index + 1;
-        });
-        
+        rankingData.forEach((item, index) => { item.ranking_position = index + 1; });
         console.log('🏆 Ranking carregado:', rankingData.length);
       } catch (err) {
         console.warn('⚠️ Erro ao carregar ranking:', err);
       }
 
-      setStats({
-        totalAthletes,
-        presentToday,
-        absentToday,
-        totalCoaches,
-        totalTeams,
-        totalTrainings: 0,
-        attendanceRate,
-      });
-
+      setStats({ totalAthletes, presentToday, absentToday, totalCoaches, totalTeams, totalTrainings: 0, attendanceRate });
       setRecentAthletes(athletesData?.slice(-5).reverse() || []);
       setRankingTop3(rankingData.slice(0, 3));
 
@@ -804,14 +453,10 @@ export default function DashboardScreen() {
       athletesData?.forEach((a: any) => {
         categoryMap[a.category] = (categoryMap[a.category] || 0) + 1;
       });
-      const categoryData = Object.entries(categoryMap).map(([name, value]) => ({
-        name,
-        value,
-      }));
+      const categoryData = Object.entries(categoryMap).map(([name, value]) => ({ name, value }));
       setAthletesByCategory(categoryData);
-
       setLastUpdate(new Date().toLocaleTimeString('pt-BR'));
-      
+
     } catch (err) {
       console.error('❌ Erro ao carregar dashboard:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar dados';
@@ -822,25 +467,18 @@ export default function DashboardScreen() {
     }
   };
 
-  // ========== EFFECTS ==========
   useEffect(() => {
     stopCarousel();
-    
     if (rankingTop3.length > 0) {
       const topPoints = rankingTop3[0]?.points || 0;
       const tiedAthletes = rankingTop3.filter(a => a.points === topPoints);
-      
       setChampionCarousel(tiedAthletes);
       setCurrentChampionIndex(0);
-      
       fadeAnim.setValue(1);
       scaleAnim.setValue(1);
       slideAnim.setValue(0);
-      
       if (tiedAthletes.length > 1) {
-        setTimeout(() => {
-          startCarousel();
-        }, 500);
+        setTimeout(() => { startCarousel(); }, 500);
       } else {
         setShowChampionCarousel(false);
         setCarouselStarted(false);
@@ -850,19 +488,14 @@ export default function DashboardScreen() {
       setShowChampionCarousel(false);
       setCarouselStarted(false);
     }
-
-    return () => {
-      stopCarousel();
-    };
+    return () => { stopCarousel(); };
   }, [rankingTop3]);
 
   useFocusEffect(
     useCallback(() => {
       console.log('🔄 Dashboard em foco, atualizando dados...');
       fetchDashboardData();
-      return () => {
-        stopCarousel();
-      };
+      return () => { stopCarousel(); };
     }, [])
   );
 
@@ -880,31 +513,24 @@ export default function DashboardScreen() {
     fetchDashboardData();
   };
 
-  // Dados para gráficos
   const attendanceChartData = {
     labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
-    datasets: [
-      {
-        data: [
-          stats.presentToday * 0.2 + 10,
-          stats.presentToday * 0.4 + 15,
-          stats.presentToday * 0.6 + 20,
-          stats.presentToday * 0.8 + 25,
-          stats.presentToday * 0.7 + 30,
-          stats.presentToday * 0.3 + 5,
-          stats.presentToday * 0.1,
-        ],
-      },
-    ],
+    datasets: [{
+      data: [
+        stats.presentToday * 0.2 + 10,
+        stats.presentToday * 0.4 + 15,
+        stats.presentToday * 0.6 + 20,
+        stats.presentToday * 0.8 + 25,
+        stats.presentToday * 0.7 + 30,
+        stats.presentToday * 0.3 + 5,
+        stats.presentToday * 0.1,
+      ],
+    }],
   };
 
   const barData = {
     labels: athletesByCategory.map(item => item.name).slice(0, 5),
-    datasets: [
-      {
-        data: athletesByCategory.map(item => item.value).slice(0, 5),
-      },
-    ],
+    datasets: [{ data: athletesByCategory.map(item => item.value).slice(0, 5) }],
   };
 
   const finalBarData = barData.labels.length > 0 ? barData : {
@@ -913,20 +539,8 @@ export default function DashboardScreen() {
   };
 
   const pieData = [
-    { 
-      name: 'Presentes', 
-      population: stats.presentToday || 10, 
-      color: '#10B981', 
-      legendFontColor: colors.textSecondary, 
-      legendFontSize: 12 
-    },
-    { 
-      name: 'Ausentes', 
-      population: stats.absentToday || 5, 
-      color: '#EF4444', 
-      legendFontColor: colors.textSecondary, 
-      legendFontSize: 12 
-    },
+    { name: 'Presentes', population: stats.presentToday || 10, color: '#10B981', legendFontColor: colors.textSecondary, legendFontSize: 12 },
+    { name: 'Ausentes', population: stats.absentToday || 5, color: '#EF4444', legendFontColor: colors.textSecondary, legendFontSize: 12 },
   ];
 
   const chartConfig = {
@@ -936,54 +550,24 @@ export default function DashboardScreen() {
     decimalPlaces: 0,
     color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
     labelColor: (opacity = 1) => `rgba(156, 163, 175, ${opacity})`,
-    style: {
-      borderRadius: 16,
-    },
-    propsForDots: {
-      r: '6',
-      strokeWidth: '2',
-      stroke: '#3B82F6',
-    },
+    style: { borderRadius: 16 },
+    propsForDots: { r: '6', strokeWidth: '2', stroke: '#3B82F6' },
     barPercentage: 0.7,
   };
 
   const chartWidth = width - 32 - 16;
 
-  // Renderizar o carrossel do campeão
   const renderChampionCarousel = () => {
     if (championCarousel.length === 0) return null;
-
     const athlete = championCarousel[currentChampionIndex];
-    
     return (
-      <Animated.View 
-        style={[
-          styles.championCarouselContainer,
-          {
-            opacity: fadeAnim,
-            transform: [
-              { scale: scaleAnim },
-              { translateX: slideAnim }
-            ]
-          }
-        ]}
-      >
-        <TouchableOpacity 
-          style={styles.championCard}
-          onPress={() => navigation.navigate('Ranking')}
-          activeOpacity={0.8}
-        >
+      <Animated.View style={[styles.championCarouselContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }, { translateX: slideAnim }] }]}>
+        <TouchableOpacity style={styles.championCard} onPress={() => navigation.navigate('Ranking')} activeOpacity={0.8}>
           <View style={styles.championAvatar}>
             {athlete.avatar_url && !imageErrors[athlete.id] ? (
-              <Image
-                source={{ uri: getAvatarUrl(athlete.avatar_url) || undefined }}
-                style={styles.championAvatarImage}
-                onError={() => handleImageError(athlete.id)}
-              />
+              <Image source={{ uri: getAvatarUrl(athlete.avatar_url) || undefined }} style={styles.championAvatarImage} onError={() => handleImageError(athlete.id)} />
             ) : (
-              <Text style={styles.championAvatarText}>
-                {athlete.name?.charAt(0)?.toUpperCase() || '?'}
-              </Text>
+              <Text style={styles.championAvatarText}>{athlete.name?.charAt(0)?.toUpperCase() || '?'}</Text>
             )}
           </View>
           <View style={styles.championInfo}>
@@ -1006,17 +590,10 @@ export default function DashboardScreen() {
 
   const renderCarouselIndicators = () => {
     if (championCarousel.length <= 1) return null;
-
     return (
       <View style={styles.carouselIndicators}>
         {championCarousel.map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.indicatorDot,
-              currentChampionIndex === index && styles.indicatorDotActive,
-            ]}
-          />
+          <View key={index} style={[styles.indicatorDot, currentChampionIndex === index && styles.indicatorDotActive]} />
         ))}
       </View>
     );
@@ -1039,46 +616,28 @@ export default function DashboardScreen() {
         </View>
       );
     }
-
     return (
       <View style={styles.rankingCard}>
         <View style={styles.rankingHeader}>
-          <Text style={styles.rankingTitle}>
-            {championCarousel.length > 1 ? '👑 CARROSSEL DE CAMPEÕES' : '🏆 Ranking de Presença'}
-          </Text>
+          <Text style={styles.rankingTitle}>{championCarousel.length > 1 ? '👑 CARROSSEL DE CAMPEÕES' : '🏆 Ranking de Presença'}</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Ranking')}>
             <Text style={styles.rankingSeeAll}>Ver todos →</Text>
           </TouchableOpacity>
         </View>
-
         {renderChampionCarousel()}
         {renderCarouselIndicators()}
-
         <View style={styles.rankingList}>
           {rankingTop3.slice(1).map((item, index) => {
             const position = index + 2;
             const medal = position === 2 ? '🥈' : '🥉';
             return (
-              <TouchableOpacity 
-                key={item.id} 
-                style={[styles.rankingItem, index === rankingTop3.length - 2 && styles.rankingItemLast]}
-                onPress={() => navigation.navigate('Ranking')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.rankingPosition, position === 2 && styles.rankingPositionGold]}>
-                  {medal}
-                </Text>
+              <TouchableOpacity key={item.id} style={[styles.rankingItem, index === rankingTop3.length - 2 && styles.rankingItemLast]} onPress={() => navigation.navigate('Ranking')} activeOpacity={0.7}>
+                <Text style={[styles.rankingPosition, position === 2 && styles.rankingPositionGold]}>{medal}</Text>
                 <View style={styles.rankingAvatar}>
                   {item.avatar_url && !imageErrors[item.id] ? (
-                    <Image
-                      source={{ uri: getAvatarUrl(item.avatar_url) || undefined }}
-                      style={styles.rankingAvatarImage}
-                      onError={() => handleImageError(item.id)}
-                    />
+                    <Image source={{ uri: getAvatarUrl(item.avatar_url) || undefined }} style={styles.rankingAvatarImage} onError={() => handleImageError(item.id)} />
                   ) : (
-                    <Text style={styles.rankingAvatarText}>
-                      {item.name?.charAt(0)?.toUpperCase() || '?'}
-                    </Text>
+                    <Text style={styles.rankingAvatarText}>{item.name?.charAt(0)?.toUpperCase() || '?'}</Text>
                   )}
                 </View>
                 <Text style={styles.rankingName} numberOfLines={1}>{item.name}</Text>
@@ -1113,32 +672,17 @@ export default function DashboardScreen() {
     );
   }
 
+  const isWeb = Platform.OS === 'web';
+
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary || '#3B82F6'} />
-      }
-      showsVerticalScrollIndicator={false}
-    >
-      {/* ========== HEADER COM LOGO IGUAL AO APP.TSX ========== */}
+    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary || '#3B82F6'} />} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <LogoTitle />
-
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>📊 Dashboard</Text>
-          <Text style={styles.headerSubtitle}>
-            {new Date().toLocaleDateString('pt-BR', { 
-              weekday: 'long', 
-              day: 'numeric', 
-              month: 'long' 
-            })}
-          </Text>
-          <Text style={styles.headerUpdate}>
-            🕐 {lastUpdate}
-          </Text>
+          <Text style={styles.headerSubtitle}>{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+          <Text style={styles.headerUpdate}>🕐 {lastUpdate}</Text>
         </View>
-
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
             <Text style={{ fontSize: 18 }}>🔄</Text>
@@ -1146,7 +690,6 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* Stats Grid */}
       <View style={styles.statsGrid}>
         <View style={[styles.statCard, { borderColor: (colors.primary || '#3B82F6') + '40' }]}>
           <View style={styles.statCardHeader}>
@@ -1193,21 +736,17 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* RANKING DE PRESENÇA COM CARROSSEL */}
       {renderRanking()}
 
       {/* Gráfico de Frequência */}
       <View style={styles.chartCard}>
         <Text style={styles.chartTitle}>📈 Frequência da Semana</Text>
         <View style={styles.lineChartContainer}>
-          <LineChart
-            data={attendanceChartData}
-            width={chartWidth}
-            height={200}
-            chartConfig={chartConfig}
-            bezier
-            style={styles.chart}
-          />
+          {isWeb ? (
+            <WebLineChartFallback data={attendanceChartData} />
+          ) : (
+            <LineChart data={attendanceChartData} width={chartWidth} height={200} chartConfig={chartConfig} bezier style={styles.chart} />
+          )}
         </View>
       </View>
 
@@ -1215,50 +754,31 @@ export default function DashboardScreen() {
       <View style={styles.chartCard}>
         <Text style={styles.chartTitle}>📊 Atletas por Categoria</Text>
         <View style={styles.barChartContainer}>
-          <BarChart
-            data={finalBarData}
-            width={chartWidth}
-            height={200}
-            chartConfig={chartConfig}
-            style={styles.chart}
-            showValuesOnTopOfBars={true}
-            yAxisLabel=""
-            yAxisSuffix=""
-            fromZero={true}
-          />
+          {isWeb ? (
+            <WebBarChartFallback data={finalBarData} />
+          ) : (
+            <BarChart data={finalBarData} width={chartWidth} height={200} chartConfig={chartConfig} style={styles.chart} showValuesOnTopOfBars={true} yAxisLabel="" yAxisSuffix="" fromZero={true} />
+          )}
         </View>
       </View>
 
       {/* Gráfico de Distribuição */}
       <View style={styles.chartCard}>
         <Text style={styles.chartTitle}>🥧 Distribuição de Presença</Text>
-        <PieChart
-          data={pieData}
-          width={chartWidth}
-          height={180}
-          chartConfig={{
-            color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-          }}
-          accessor="population"
-          backgroundColor="transparent"
-          paddingLeft="15"
-          absolute
-        />
+        {isWeb ? (
+          <WebPieChartFallback data={pieData} />
+        ) : (
+          <PieChart data={pieData} width={chartWidth} height={180} chartConfig={{ color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})` }} accessor="population" backgroundColor="transparent" paddingLeft="15" absolute />
+        )}
       </View>
 
-      {/* Progresso de Presença */}
       <View style={styles.progressCard}>
         <View style={styles.progressHeader}>
           <Text style={styles.progressTitle}>📈 Taxa de Presença</Text>
           <Text style={styles.progressValue}>{stats.attendanceRate.toFixed(0)}%</Text>
         </View>
         <View style={styles.progressBar}>
-          <View 
-            style={[
-              styles.progressFill, 
-              { width: `${stats.attendanceRate}%` }
-            ]} 
-          />
+          <View style={[styles.progressFill, { width: `${stats.attendanceRate}%` }]} />
         </View>
         <View style={styles.progressStats}>
           <Text style={styles.progressStat}>✅ {stats.presentToday} presentes</Text>
@@ -1266,7 +786,6 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* Resumo */}
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>📊 Resumo</Text>
         <View style={styles.summaryGrid}>
@@ -1285,7 +804,6 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* Últimos Atletas */}
       <View style={styles.recentSection}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>🆕 Últimos Atletas</Text>
@@ -1303,20 +821,13 @@ export default function DashboardScreen() {
             const avatarUrl = getAvatarUrl(athlete.avatar_url);
             const hasError = imageErrors[athlete.id];
             const showInitials = !avatarUrl || hasError;
-
             return (
               <View key={athlete.id} style={styles.athleteItem}>
                 <View style={styles.athleteAvatar}>
                   {showInitials ? (
-                    <Text style={styles.athleteAvatarText}>
-                      {athlete.name?.charAt(0)?.toUpperCase() || '?'}
-                    </Text>
+                    <Text style={styles.athleteAvatarText}>{athlete.name?.charAt(0)?.toUpperCase() || '?'}</Text>
                   ) : (
-                    <Image
-                      source={{ uri: avatarUrl || undefined }}
-                      style={styles.athleteAvatarImage}
-                      onError={() => handleImageError(athlete.id)}
-                    />
+                    <Image source={{ uri: avatarUrl || undefined }} style={styles.athleteAvatarImage} onError={() => handleImageError(athlete.id)} />
                   )}
                 </View>
                 <View style={styles.athleteInfo}>

@@ -50,7 +50,8 @@ const mockTrainings = [
 ];
 
 // GET - Listar todos os treinos
-import { API_BASE_URL } from '@/lib/config';
+import { API_BASE } from '@/lib/config';
+const API_BASE_URL = API_BASE;
 
 export async function GET() {
   try {

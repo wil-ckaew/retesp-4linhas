@@ -77,6 +77,69 @@ const convertToBackendDate = (dateStr: string) => {
   return dateStr;
 };
 
+// ============================================================
+// DATE INPUT — Web usa <input type="date">, Mobile usa TextInput
+// ============================================================
+interface DateInputProps {
+  label: string;
+  displayValue: string;
+  backendValue: string;
+  onDisplayChange: (text: string) => void;
+  onWebChange: (isoDate: string) => void;
+  colors: any;
+  styles: any;
+}
+
+const DateInput = ({ label, displayValue, backendValue, onDisplayChange, onWebChange, colors, styles }: DateInputProps) => {
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>{label}</Text>
+        <View style={styles.inputWrapper}>
+          <Text style={styles.emojiIcon}>📅</Text>
+          <input
+            type="date"
+            value={backendValue || ''}
+            onChange={(e) => onWebChange(e.target.value)}
+            style={{
+              flex: 1,
+              backgroundColor: 'transparent',
+              border: 'none',
+              outline: 'none',
+              padding: '12px 0',
+              fontSize: '16px',
+              color: colors.text,
+              fontFamily: 'inherit',
+              width: '100%',
+              boxSizing: 'border-box',
+            }}
+          />
+        </View>
+        <Text style={styles.dateHelper}>Selecione no calendário</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <View style={styles.inputWrapper}>
+        <Text style={styles.emojiIcon}>📅</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="DD/MM/AAAA"
+          placeholderTextColor={colors.textSecondary}
+          value={displayValue}
+          onChangeText={onDisplayChange}
+          keyboardType="numeric"
+          maxLength={10}
+        />
+      </View>
+      <Text style={styles.dateHelper}>Digite no formato: dia/mês/ano (ex: 15/03/2000)</Text>
+    </View>
+  );
+};
+
 export default function EditAthleteScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
@@ -112,35 +175,18 @@ export default function EditAthleteScreen() {
   const [uploadingMedicalForm, setUploadingMedicalForm] = useState(false);
 
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollContent: {
-      padding: 16,
-    },
+    container: { flex: 1, backgroundColor: colors.background },
+    scrollContent: { padding: 16 },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 16,
     },
-    headerLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    backButton: {
-      padding: 8,
-      marginRight: 8,
-    },
-    title: {
-      color: colors.text,
-      fontSize: 24,
-      fontWeight: 'bold',
-    },
-    deleteButton: {
-      padding: 8,
-    },
+    headerLeft: { flexDirection: 'row', alignItems: 'center' },
+    backButton: { padding: 8, marginRight: 8 },
+    title: { color: colors.text, fontSize: 24, fontWeight: 'bold' },
+    deleteButton: { padding: 8 },
     card: {
       backgroundColor: colors.card,
       borderRadius: 16,
@@ -169,21 +215,15 @@ export default function EditAthleteScreen() {
       paddingVertical: 8,
       borderRadius: 8,
     },
-    uploadButtonDisabled: {
-      opacity: 0.5,
-    },
+    uploadButtonDisabled: { opacity: 0.5 },
     uploadButtonText: {
       color: '#FFFFFF',
       fontSize: 14,
       fontWeight: '600',
       marginLeft: 8,
     },
-    uploadButtonGreen: {
-      backgroundColor: '#22c55e',
-    },
-    removeButton: {
-      padding: 8,
-    },
+    uploadButtonGreen: { backgroundColor: '#22c55e' },
+    removeButton: { padding: 8 },
     avatarPreview: {
       width: 48,
       height: 48,
@@ -192,24 +232,10 @@ export default function EditAthleteScreen() {
       borderColor: colors.primary,
       overflow: 'hidden',
     },
-    avatarImage: {
-      width: 48,
-      height: 48,
-      resizeMode: 'cover',
-    },
-    fileInfo: {
-      color: colors.text,
-      fontSize: 14,
-      marginLeft: 4,
-    },
-    helperText: {
-      color: colors.textSecondary,
-      fontSize: 12,
-      marginTop: 4,
-    },
-    inputContainer: {
-      marginBottom: 16,
-    },
+    avatarImage: { width: 48, height: 48, resizeMode: 'cover' },
+    fileInfo: { color: colors.text, fontSize: 14, marginLeft: 4 },
+    helperText: { color: colors.textSecondary, fontSize: 12, marginTop: 4 },
+    inputContainer: { marginBottom: 16 },
     inputLabel: {
       color: colors.textSecondary,
       fontSize: 14,
@@ -231,9 +257,7 @@ export default function EditAthleteScreen() {
       paddingVertical: 12,
       fontSize: 16,
     },
-    inputIcon: {
-      marginRight: 8,
-    },
+    inputIcon: { marginRight: 8 },
     picker: {
       backgroundColor: colors.background,
       borderWidth: 1,
@@ -248,18 +272,10 @@ export default function EditAthleteScreen() {
       borderRadius: 4,
       marginBottom: 4,
     },
-    pickerItemActive: {
-      backgroundColor: colors.primary,
-    },
-    pickerItemText: {
-      fontSize: 16,
-    },
-    pickerItemTextActive: {
-      color: '#FFFFFF',
-    },
-    pickerItemTextInactive: {
-      color: colors.text,
-    },
+    pickerItemActive: { backgroundColor: colors.primary },
+    pickerItemText: { fontSize: 16 },
+    pickerItemTextActive: { color: '#FFFFFF' },
+    pickerItemTextInactive: { color: colors.text },
     submitButton: {
       backgroundColor: colors.primary,
       padding: 16,
@@ -267,51 +283,17 @@ export default function EditAthleteScreen() {
       alignItems: 'center',
       marginTop: 8,
     },
-    submitButtonDisabled: {
-      opacity: 0.5,
-    },
-    submitButtonText: {
-      color: '#FFFFFF',
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    divider: {
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      marginVertical: 16,
-    },
-    centered: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: colors.background,
-    },
-    loadingText: {
-      color: colors.textSecondary,
-      marginTop: 12,
-    },
-    docLink: {
-      color: colors.primary,
-      fontSize: 14,
-      marginLeft: 8,
-    },
-    dateHelper: {
-      color: colors.textSecondary,
-      fontSize: 11,
-      marginTop: 4,
-      marginLeft: 4,
-    },
+    submitButtonDisabled: { opacity: 0.5 },
+    submitButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
+    divider: { borderTopWidth: 1, borderTopColor: colors.border, marginVertical: 16 },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+    loadingText: { color: colors.textSecondary, marginTop: 12 },
+    docLink: { color: colors.primary, fontSize: 14, marginLeft: 8 },
+    dateHelper: { color: colors.textSecondary, fontSize: 11, marginTop: 4, marginLeft: 4 },
     emojiIcon: { fontSize: 16, width: 24, textAlign: 'center' },
-    emojiIconLarge: { fontSize: 22, width: 32, textAlign: 'center' },
-    emojiIconSmall: { fontSize: 14, width: 20, textAlign: 'center' },
     emojiButton: { fontSize: 18, marginRight: 4 },
-    row: {
-      flexDirection: 'row',
-      gap: 12,
-    },
-    rowHalf: {
-      flex: 1,
-    },
+    row: { flexDirection: 'row', gap: 12 },
+    rowHalf: { flex: 1 },
   });
 
   useEffect(() => {
@@ -320,9 +302,7 @@ export default function EditAthleteScreen() {
 
       try {
         const res = await fetch(`${API_URL}/athletes/${id}`, {
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
+          headers: { 'Cache-Control': 'no-cache' },
         });
         if (res.ok) {
           const data: Athlete = await res.json();
@@ -371,12 +351,17 @@ export default function EditAthleteScreen() {
     setFormData({ ...formData, birth_date: backendDate });
   };
 
+  // Handler específico para o web (input type="date" retorna YYYY-MM-DD)
+  const handleWebDateChange = (isoDate: string) => {
+    console.log('[Web] 📅 Data selecionada:', isoDate);
+    setFormData({ ...formData, birth_date: isoDate });
+    setDisplayDate(convertToDisplayDate(isoDate));
+  };
+
   const handleAvatarUpload = async () => {
     try {
       const result: any = await pickImage();
-      
       if (result.didCancel) return;
-
       const asset = result.assets?.[0];
       if (!asset) return;
 
@@ -389,7 +374,6 @@ export default function EditAthleteScreen() {
       setUploadingAvatar(true);
 
       const formDataUpload = new FormData();
-      
       if (Platform.OS === 'web') {
         const response = await fetch(asset.uri);
         const blob = await response.blob();
@@ -407,7 +391,6 @@ export default function EditAthleteScreen() {
           method: 'POST',
           body: formDataUpload,
         });
-
         if (res.ok) {
           const data = await res.json();
           setAvatarUrl(data.url);
@@ -432,7 +415,6 @@ export default function EditAthleteScreen() {
   const handleMedicalFormUpload = async () => {
     try {
       const result: any = await pickPDF();
-      
       const file = result[0];
       if (!file) return;
 
@@ -445,7 +427,6 @@ export default function EditAthleteScreen() {
       setUploadingMedicalForm(true);
 
       const formDataUpload = new FormData();
-      
       if (Platform.OS === 'web') {
         const response = await fetch(file.uri);
         const blob = await response.blob();
@@ -463,7 +444,6 @@ export default function EditAthleteScreen() {
           method: 'POST',
           body: formDataUpload,
         });
-
         if (res.ok) {
           const data = await res.json();
           setMedicalFormUrl(data.url);
@@ -506,22 +486,12 @@ export default function EditAthleteScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const res = await fetch(`${API_URL}/athletes/${id}`, {
-                method: 'DELETE',
-              });
+              const res = await fetch(`${API_URL}/athletes/${id}`, { method: 'DELETE' });
               if (res.ok) {
                 Alert.alert('✅ Sucesso', 'Atleta excluído com sucesso!');
                 navigation.reset({
                   index: 0,
-                  routes: [
-                    {
-                      name: 'Main',
-                      state: {
-                        index: 0,
-                        routes: [{ name: 'Atletas' }],
-                      },
-                    },
-                  ],
+                  routes: [{ name: 'Main', state: { index: 0, routes: [{ name: 'Atletas' }] } }],
                 });
               } else {
                 Alert.alert('❌ Erro', 'Erro ao excluir atleta');
@@ -574,15 +544,7 @@ export default function EditAthleteScreen() {
         Alert.alert('✅ Sucesso', 'Atleta atualizado com sucesso!');
         navigation.reset({
           index: 0,
-          routes: [
-            {
-              name: 'Main',
-              state: {
-                index: 0,
-                routes: [{ name: 'Atletas' }],
-              },
-            },
-          ],
+          routes: [{ name: 'Main', state: { index: 0, routes: [{ name: 'Atletas' }] } }],
         });
       } else {
         const err = await res.text();
@@ -661,32 +623,23 @@ export default function EditAthleteScreen() {
           </View>
         </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>📅 Data de nascimento</Text>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.emojiIcon}>📅</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="DD/MM/AAAA"
-              placeholderTextColor={colors.textSecondary}
-              value={displayDate}
-              onChangeText={handleDateChange}
-              keyboardType="numeric"
-              maxLength={10}
-            />
-          </View>
-          <Text style={styles.dateHelper}>Digite no formato: dia/mês/ano (ex: 15/03/2000)</Text>
-        </View>
+        {/* DATA DE NASCIMENTO — componente DateInput */}
+        <DateInput
+          label="📅 Data de nascimento"
+          displayValue={displayDate}
+          backendValue={formData.birth_date}
+          onDisplayChange={handleDateChange}
+          onWebChange={handleWebDateChange}
+          colors={colors}
+          styles={styles}
+        />
 
         <Text style={styles.inputLabel}>🏷️ Categoria / Turma</Text>
         <View style={styles.picker}>
           {['Sub-10', 'Sub-12', 'Sub-14', 'Sub-16', 'Sub-18'].map((cat) => (
             <TouchableOpacity
               key={cat}
-              style={[
-                styles.pickerItem,
-                formData.category === cat && styles.pickerItemActive,
-              ]}
+              style={[styles.pickerItem, formData.category === cat && styles.pickerItemActive]}
               onPress={() => handleChange('category', cat)}
             >
               <Text
@@ -701,9 +654,8 @@ export default function EditAthleteScreen() {
           ))}
         </View>
 
-        {/* NOVOS CAMPOS */}
         <View style={styles.divider} />
-        
+
         <Text style={styles.inputLabel}>📞 Telefone</Text>
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
@@ -796,7 +748,7 @@ export default function EditAthleteScreen() {
         </View>
 
         <View style={styles.divider} />
-        
+
         <Text style={styles.inputLabel}>🆘 Contato de Emergência</Text>
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
@@ -827,7 +779,7 @@ export default function EditAthleteScreen() {
         </View>
 
         <View style={styles.divider} />
-        
+
         <Text style={styles.sectionLabel}>📄 Ficha do Atleta (3 páginas)</Text>
         <View style={styles.uploadContainer}>
           {currentMedicalFormUrl && !medicalFormFile && (

@@ -1,44 +1,13 @@
 //mobile/src/services/api.ts
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 
-const getEnvApiUrl = (): string | undefined => {
-  const expoExtraUrl = Constants?.expoConfig?.extra?.API_URL;
-  if (expoExtraUrl) return expoExtraUrl;
-  if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
-  if (process.env.API_URL) return process.env.API_URL;
-  return undefined;
-};
+// IP FIXO do Tailscale
+const TAILSCALE_IP = '100.107.163.24';
+const BACKEND_PORT = 8081;
 
 const getApiUrl = (): string => {
-  const envUrl = getEnvApiUrl();
-  const fallback = envUrl || 'http://localhost:8081';
-
-  if (Platform.OS === 'android') {
-    const emulatorHosts = ['10.0.2.2', '10.0.3.2', 'localhost'];
-    const detected = envUrl ? new URL(envUrl).hostname : emulatorHosts[0];
-
-    if (envUrl) {
-      return envUrl;
-    }
-
-    const host = detected && detected !== 'localhost' ? detected : emulatorHosts[0];
-    return `http://${host}:8081`;
-  }
-
-  if (Platform.OS === 'ios') {
-    return envUrl || 'http://localhost:8081';
-  }
-
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return envUrl || 'http://localhost:8081';
-    }
-    return envUrl || `http://${hostname}:8081`;
-  }
-
-  return fallback;
+  // Sempre usa o IP do Tailscale
+  return `http://${TAILSCALE_IP}:${BACKEND_PORT}`;
 };
 
 export const API_URL = getApiUrl();

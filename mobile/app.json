@@ -27,6 +27,9 @@
       "expo-video",
       "expo-image",
       "expo-sharing"
-    ]
+    ],
+    "extra": {
+      "API_URL": "http://192.168.100.105:8081"
+    }
   }
 }
