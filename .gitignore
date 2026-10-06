@@ -106,3 +106,7 @@ backup_*.sql
 backup-db.sh
 teste.txt
 main.rs.patch
+retesp_backup_*.tar.gz
+*.tar.gz
+retesp_backup_*.tar.gz
+*.tar.gz
