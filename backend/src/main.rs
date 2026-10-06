@@ -1290,6 +1290,319 @@ async fn rename_media(path: web::Path<Uuid>, req: web::Json<RenameMediaRequest>,
     }
 }
 
+
+// ============================================
+// IMAGE CONSENTS - Termo de Autorização de Imagem
+// ============================================
+
+#[derive(Deserialize)]
+struct CreateImageConsentRequest {
+    athlete_id: Uuid,
+    guardian_name: String,
+    guardian_cpf: String,
+    guardian_rg: Option<String>,
+    guardian_email: Option<String>,
+    guardian_phone: Option<String>,
+    relationship: String,
+    signature_data: Option<String>,  // base64 da assinatura digital
+    consent_text: String,
+    consent_version: Option<String>,
+}
+
+#[derive(Serialize)]
+struct ImageConsentResponse {
+    id: String,
+    athlete_id: String,
+    athlete_name: Option<String>,
+    guardian_name: String,
+    guardian_cpf: String,
+    guardian_rg: Option<String>,
+    guardian_email: Option<String>,
+    guardian_phone: Option<String>,
+    relationship: String,
+    consent_type: String,
+    signature_data: Option<String>,
+    document_url: Option<String>,
+    pdf_url: Option<String>,
+    ip_address: Option<String>,
+    user_agent: Option<String>,
+    device_info: Option<String>,
+    signed_at: String,
+    valid_until: Option<String>,
+    revoked_at: Option<String>,
+    revoked_reason: Option<String>,
+    status: String,
+    consent_text: String,
+    consent_version: String,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Deserialize)]
+struct RevokeImageConsentRequest {
+    reason: Option<String>,
+}
+
+// POST /image-consents - Criar termo (assinatura digital)
+async fn create_image_consent(
+    req: web::Json<CreateImageConsentRequest>,
+    http_req: actix_web::HttpRequest,
+    pool: web::Data<PgPool>,
+) -> impl Responder {
+    let data = req.into_inner();
+    
+    // Verificar se o atleta existe
+    let athlete_exists = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM athletes WHERE id = $1"
+    )
+    .bind(&data.athlete_id)
+    .fetch_one(&**pool)
+    .await;
+    
+    match athlete_exists {
+        Ok(count) if count == 0 => {
+            return HttpResponse::NotFound().json(serde_json::json!({
+                "error": "Atleta não encontrado"
+            }));
+        }
+        Err(e) => {
+            eprintln!("Erro ao verificar atleta: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Erro ao verificar atleta"
+            }));
+        }
+        _ => {}
+    }
+    
+    // Verificar se já existe termo ativo
+    let existing = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM image_consents WHERE athlete_id = $1 AND status = 'active'"
+    )
+    .bind(&data.athlete_id)
+    .fetch_one(&**pool)
+    .await
+    .unwrap_or(0);
+    
+    if existing > 0 {
+        return HttpResponse::Conflict().json(serde_json::json!({
+            "error": "Já existe um termo ativo para este atleta"
+        }));
+    }
+    
+    // Extrair IP e User-Agent
+    let ip_address = http_req
+        .connection_info()
+        .realip_remote_addr()
+        .unwrap_or("unknown")
+        .to_string();
+    
+    let user_agent = http_req
+        .headers()
+        .get("user-agent")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("unknown")
+        .to_string();
+    
+    let device_info = http_req
+        .headers()
+        .get("sec-ch-ua-platform")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("unknown")
+        .to_string();
+    
+    let consent_version = data.consent_version.unwrap_or_else(|| "1.0".to_string());
+    
+    let result = sqlx::query_as::<_, (Uuid, chrono::DateTime<Utc>)>(
+        r#"
+        INSERT INTO image_consents (
+            athlete_id, guardian_name, guardian_cpf, guardian_rg,
+            guardian_email, guardian_phone, relationship,
+            consent_type, signature_data, consent_text, consent_version,
+            ip_address, user_agent, device_info, status
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'digital', $8, $9, $10, $11, $12, $13, 'active')
+        RETURNING id, signed_at
+        "#
+    )
+    .bind(&data.athlete_id)
+    .bind(&data.guardian_name)
+    .bind(&data.guardian_cpf)
+    .bind(&data.guardian_rg)
+    .bind(&data.guardian_email)
+    .bind(&data.guardian_phone)
+    .bind(&data.relationship)
+    .bind(&data.signature_data)
+    .bind(&data.consent_text)
+    .bind(&consent_version)
+    .bind(&ip_address)
+    .bind(&user_agent)
+    .bind(&device_info)
+    .fetch_one(&**pool)
+    .await;
+    
+    match result {
+        Ok((id, signed_at)) => {
+            println!("✅ Termo de imagem criado: {} para atleta {}", id, data.athlete_id);
+            HttpResponse::Created().json(serde_json::json!({
+                "id": id.to_string(),
+                "athlete_id": data.athlete_id.to_string(),
+                "signed_at": signed_at.to_rfc3339(),
+                "status": "active",
+                "message": "Termo assinado com sucesso!"
+            }))
+        }
+        Err(e) => {
+            eprintln!("❌ Erro ao criar termo: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Erro ao criar termo: {}", e)
+            }))
+        }
+    }
+}
+
+// GET /image-consents/athlete/{athlete_id} - Buscar termo do atleta
+async fn get_image_consent_by_athlete(
+    path: web::Path<Uuid>,
+    pool: web::Data<PgPool>,
+) -> impl Responder {
+    let athlete_id = path.into_inner();
+    
+    let result = sqlx::query_as::<_, (
+        Uuid, Uuid, String, String, Option<String>,
+        Option<String>, Option<String>, String, String, Option<String>,
+        Option<String>, Option<String>, Option<String>, String,
+        chrono::DateTime<Utc>
+    )>(
+        r#"
+        SELECT 
+            ic.id, ic.athlete_id, ic.guardian_name, ic.guardian_cpf, ic.guardian_rg,
+            ic.guardian_email, ic.guardian_phone, ic.relationship, ic.consent_type,
+            ic.signature_data, ic.document_url, ic.pdf_url, ic.ip_address,
+            ic.status, ic.signed_at
+        FROM image_consents ic
+        WHERE ic.athlete_id = $1 AND ic.status = 'active'
+        ORDER BY ic.signed_at DESC
+        LIMIT 1
+        "#
+    )
+    .bind(&athlete_id)
+    .fetch_optional(&**pool)
+    .await;
+    
+    match result {
+        Ok(Some(row)) => {
+            let response = serde_json::json!({
+                "id": row.0.to_string(),
+                "athlete_id": row.1.to_string(),
+                "guardian_name": row.2,
+                "guardian_cpf": row.3,
+                "guardian_rg": row.4,
+                "guardian_email": row.5,
+                "guardian_phone": row.6,
+                "relationship": row.7,
+                "consent_type": row.8,
+                "signature_data": row.9,
+                "document_url": row.10,
+                "pdf_url": row.11,
+                "ip_address": row.12,
+                "status": row.13,
+                "signed_at": row.14.to_rfc3339(),
+            });
+            HttpResponse::Ok().json(response)
+        }
+        Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Nenhum termo ativo encontrado para este atleta"
+        })),
+        Err(e) => {
+            eprintln!("Erro ao buscar termo: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Erro ao buscar termo: {}", e)
+            }))
+        }
+    }
+}
+
+async fn revoke_image_consent(
+    path: web::Path<Uuid>,
+    req: web::Json<RevokeImageConsentRequest>,
+    pool: web::Data<PgPool>,
+) -> impl Responder {
+    let id = path.into_inner();
+    let reason = req.reason.clone();
+    
+    let result = sqlx::query(
+        r#"
+        UPDATE image_consents 
+        SET status = 'revoked', revoked_at = NOW(), revoked_reason = $1
+        WHERE id = $2 AND status = 'active'
+        "#
+    )
+    .bind(&reason)
+    .bind(&id)
+    .execute(&**pool)
+    .await;
+    
+    match result {
+        Ok(r) if r.rows_affected() > 0 => {
+            println!("🚫 Termo revogado: {}", id);
+            HttpResponse::Ok().json(serde_json::json!({
+                "message": "Termo revogado com sucesso",
+                "id": id.to_string()
+            }))
+        }
+        Ok(_) => HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Termo não encontrado ou já revogado"
+        })),
+        Err(e) => {
+            eprintln!("Erro ao revogar termo: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Erro ao revogar termo: {}", e)
+            }))
+        }
+    }
+}
+
+// GET /image-consents - Listar todos os termos
+async fn list_image_consents(pool: web::Data<PgPool>) -> impl Responder {
+    let result = sqlx::query_as::<_, (
+        Uuid, Uuid, String, String, String, String, String
+    )>(
+        r#"
+        SELECT 
+            ic.id, ic.athlete_id, a.name, ic.guardian_name,
+            ic.relationship, ic.status, ic.consent_type
+        FROM image_consents ic
+        JOIN athletes a ON a.id = ic.athlete_id
+        ORDER BY ic.signed_at DESC
+        "#
+    )
+    .fetch_all(&**pool)
+    .await;
+    
+    match result {
+        Ok(rows) => {
+            let response: Vec<serde_json::Value> = rows.iter().map(|row| {
+                serde_json::json!({
+                    "id": row.0.to_string(),
+                    "athlete_id": row.1.to_string(),
+                    "athlete_name": row.2,
+                    "guardian_name": row.3,
+                    "relationship": row.4,
+                    "status": row.5,
+                    "consent_type": row.6,
+                })
+            }).collect();
+            HttpResponse::Ok().json(response)
+        }
+        Err(e) => {
+            eprintln!("Erro ao listar termos: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Erro ao listar termos: {}", e)
+            }))
+        }
+    }
+}
+
 // --- MAIN ---
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -1359,6 +1672,13 @@ async fn main() -> std::io::Result<()> {
             .route("/media/{id}", web::put().to(rename_media))
             .route("/upload", web::post().to(upload_media))
             .route("/ai/generate_training", web::post().to(generate_training))
+            // ============================================
+            // ROTAS DE IMAGE CONSENTS (Termo de Imagem)
+            // ============================================
+            .route("/image-consents", web::post().to(create_image_consent))
+            .route("/image-consents", web::get().to(list_image_consents))
+            .route("/image-consents/athlete/{athlete_id}", web::get().to(get_image_consent_by_athlete))
+            .route("/image-consents/{id}/revoke", web::post().to(revoke_image_consent))
     })
     .bind(("0.0.0.0", app_port))?
     .run()

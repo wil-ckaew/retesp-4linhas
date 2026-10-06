@@ -241,6 +241,62 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
         .execute(pool)
         .await?;
     
+
+    // ============================================
+    // TABELA: image_consents (Termos de imagem)
+    // ============================================
+    println!("📸 Criando tabela image_consents...");
+    
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS image_consents (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            athlete_id UUID NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+            guardian_name VARCHAR(255) NOT NULL,
+            guardian_cpf VARCHAR(14) NOT NULL,
+            guardian_rg VARCHAR(20),
+            guardian_email VARCHAR(255),
+            guardian_phone VARCHAR(20),
+            relationship VARCHAR(50) NOT NULL,
+            consent_type VARCHAR(20) NOT NULL DEFAULT 'digital',
+            signature_data TEXT,
+            document_url VARCHAR(500),
+            document_hash VARCHAR(64),
+            pdf_url VARCHAR(500),
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            device_info VARCHAR(255),
+            signed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            valid_until TIMESTAMP WITH TIME ZONE,
+            revoked_at TIMESTAMP WITH TIME ZONE,
+            revoked_reason TEXT,
+            status VARCHAR(20) NOT NULL DEFAULT 'active',
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            consent_text TEXT NOT NULL,
+            consent_version VARCHAR(20) NOT NULL DEFAULT '1.0'
+        )
+        "#
+    )
+    .execute(pool)
+    .await?;
+    
+    // Índices para a tabela image_consents
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_image_consents_athlete ON image_consents(athlete_id)")
+        .execute(pool)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_image_consents_status ON image_consents(status)")
+        .execute(pool)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_image_consents_signed_at ON image_consents(signed_at DESC)")
+        .execute(pool)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_image_consents_cpf ON image_consents(guardian_cpf)")
+        .execute(pool)
+        .await?;
+    
+    println!("✅ Tabela image_consents criada com sucesso!");
+
     println!("✅ Migrações executadas com sucesso!");
     Ok(())
 }
