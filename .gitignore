@@ -110,3 +110,9 @@ retesp_backup_*.tar.gz
 *.tar.gz
 retesp_backup_*.tar.gz
 *.tar.gz
+
+# Backups
+*.bak
+*.bak-*
+*.backup
+*~
