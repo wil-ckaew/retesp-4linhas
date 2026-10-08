@@ -7,7 +7,7 @@ export default function CareerPage() {
 
   const generatePortfolio = async () => {
     if(!athleteId) return;
-    const res = await fetch(`http://192.168.100.105:8081/career/${athleteId}`);
+    const res = await fetch(`http://100.107.163.24:8081/career/${athleteId}`);
     const text = await res.text();
     setPortfolio(text);
   };

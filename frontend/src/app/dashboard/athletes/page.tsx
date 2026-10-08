@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Pencil, Trash2, Eye, FileText, Calendar, Users, ChevronDown, ChevronUp, Download, Phone, MapPin, Home, Building, Mail, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, FileText, Calendar, Users, ChevronDown, ChevronUp, Download, Phone, MapPin, Home, Building, Mail, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { getConsentByAthlete, ImageConsent } from "@/services/consentApi";
 
 type Athlete = {
   id: string;
@@ -36,9 +37,10 @@ export default function AthletesPage() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [consentsMap, setConsentsMap] = useState<Record<string, ImageConsent | null>>({});
 
   // 🔧 URL FIXA DO BACKEND - Substitua pelo seu IP se mudar
-  const API_URL = "http://192.168.100.105:8081";
+  const API_URL = "http://100.107.163.24:8081";
 
   const fetchAthletes = async () => {
     try {
@@ -59,8 +61,48 @@ export default function AthletesPage() {
   };
 
   useEffect(() => {
-    fetchAthletes();
+    fetchAthletesWithConsents();
   }, []);
+
+  // Buscar termos de todos os atletas
+  const fetchConsents = async (athletesList: Athlete[]) => {
+    const consents: Record<string, ImageConsent | null> = {};
+    await Promise.all(
+      athletesList.map(async (athlete) => {
+        try {
+          const consent = await getConsentByAthlete(athlete.id);
+          consents[athlete.id] = consent;
+        } catch (error) {
+          consents[athlete.id] = null;
+        }
+      })
+    );
+    setConsentsMap(consents);
+    console.log('📸 Termos carregados:', Object.values(consents).filter(c => c).length, 'assinados');
+  };
+
+  // Atualizar fetchAthletes para também buscar os termos
+  const fetchAthletesWithConsents = async () => {
+    try {
+      const res = await fetch(`${API_URL}/athletes?_t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        console.log("✅ Atletas carregados:", data.length);
+        setAthletes(data);
+        setImageErrors({});
+        // Buscar os termos após carregar atletas
+        if (data.length > 0) {
+          fetchConsents(data);
+        }
+      } else {
+        console.error("❌ Erro ao buscar atletas:", res.status);
+      }
+    } catch (error) {
+      console.error("❌ Erro:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const deleteAthlete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este atleta?")) return;
@@ -189,8 +231,22 @@ export default function AthletesPage() {
                       </div>
 
                       <div>
-                        <p className="font-bold text-lg">{athlete.name}</p>
-                        <div className="flex items-center gap-4 text-sm text-gray-400 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-lg">{athlete.name}</p>
+                          {/* Status do Termo de Imagem */}
+                          {consentsMap[athlete.id] ? (
+                            <span className="flex items-center gap-1 text-xs bg-green-600/20 text-green-400 border border-green-600/30 px-2 py-0.5 rounded-full">
+                              <CheckCircle size={12} />
+                              Imagem Autorizada
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs bg-orange-600/20 text-orange-400 border border-orange-600/30 px-2 py-0.5 rounded-full">
+                              <XCircle size={12} />
+                              Imagem Pendente
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-gray-400 flex-wrap mt-1">
                           <span className="flex items-center gap-1">
                             <Calendar size={14} />
                             {new Date(athlete.birth_date).toLocaleDateString("pt-BR")}
@@ -248,6 +304,136 @@ export default function AthletesPage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* CONTEÚDO EXPANDIDO */}
+                  {expandedId === athlete.id && (
+                    <div className="border-t border-[#30363D] p-6 bg-[#0D1117]">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Informações Pessoais */}
+                        <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-4">
+                          <h3 className="text-sm font-medium text-gray-400 mb-3">📋 Informações Pessoais</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Nome:</span>
+                              <span className="font-medium">{athlete.name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Data Nasc.:</span>
+                              <span className="font-medium">{new Date(athlete.birth_date).toLocaleDateString("pt-BR")}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Idade:</span>
+                              <span className="font-medium text-blue-400">{calculateAge(athlete.birth_date)} anos</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Categoria:</span>
+                              <span className="font-medium text-purple-400">{athlete.category}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Contato */}
+                        <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-4">
+                          <h3 className="text-sm font-medium text-gray-400 mb-3">📞 Contato & Endereço</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Telefone:</span>
+                              <span className="font-medium text-green-400">{athlete.phone || "Não informado"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Endereço:</span>
+                              <span className="font-medium text-sm text-right">{athlete.address || "Não informado"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Bairro:</span>
+                              <span className="font-medium">{athlete.neighborhood || "Não informado"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Cidade/UF:</span>
+                              <span className="font-medium">{athlete.city || ""} {athlete.state ? `- ${athlete.state}` : ""}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Emergência & Documentos */}
+                        <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-4">
+                          <h3 className="text-sm font-medium text-gray-400 mb-3">🆘 Emergência & Documentos</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Contato:</span>
+                              <span className="font-medium text-sm">{athlete.emergency_contact || "Não informado"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Tel. Emergência:</span>
+                              <span className="font-medium text-red-400">{athlete.emergency_phone || "Não informado"}</span>
+                            </div>
+                            <div className="border-t border-[#30363D] pt-2 mt-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-gray-400 text-sm">📄 Ficha Médica</span>
+                                {athlete.medical_form_url ? (
+                                  <a
+                                    href={`${API_URL}${athlete.medical_form_url}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-purple-400 hover:text-purple-300 text-sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    👁️ Ver
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-500 text-sm">Não anexado</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botões de Ação */}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Link
+                          href={`/dashboard/athletes/${athlete.id}`}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition text-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          👁️ Ver Perfil Completo
+                        </Link>
+                        <Link
+                          href={`/dashboard/athletes/${athlete.id}/edit`}
+                          className="flex items-center gap-2 px-4 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 rounded-lg transition text-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          ✏️ Editar Cadastro
+                        </Link>
+                        {consentsMap[athlete.id] ? (
+                          <Link
+                            href={`/parents/consent/${athlete.id}`}
+                            className="flex items-center gap-2 px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition text-sm font-medium"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            ✅ Ver Autorização de Imagem
+                          </Link>
+                        ) : (
+                          <Link
+                            href={`/parents/consent/${athlete.id}`}
+                            className="flex items-center gap-2 px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded-lg transition text-sm font-medium"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            📸 Assinar Autorização de Imagem
+                          </Link>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteAthlete(athlete.id);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition text-sm"
+                        >
+                          🗑️ Excluir Atleta
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })

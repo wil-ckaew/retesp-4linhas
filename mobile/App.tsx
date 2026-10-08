@@ -25,6 +25,7 @@ import SocialScreen from './src/screens/SocialScreen';
 import TrainingsScreen from './src/screens/TrainingsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import RankingScreen from './src/screens/RankingScreen';
+import ConsentScreen from './src/screens/ConsentScreen';
 
 // Telas de IA
 import ChatScreen from './src/screens/ChatScreen';
@@ -178,6 +179,14 @@ function AthletesStack() {
         options={{ 
           headerTitle: () => <LogoTitle />,
           title: 'Detalhes do Atleta'
+        }}
+      />
+      <Stack.Screen 
+        name="Consent" 
+        component={ConsentScreen} 
+        options={{ 
+          headerTitle: () => <LogoTitle />,
+          title: 'Autorização de Imagem'
         }}
       />
       <Stack.Screen 

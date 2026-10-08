@@ -65,7 +65,7 @@ export default function SocialPage() {
 
   const fetchFeed = async () => {
     try {
-      const res = await fetch("http://192.168.100.105:8081/social/feed?_t=" + Date.now());
+      const res = await fetch("http://100.107.163.24:8081/social/feed?_t=" + Date.now());
       if (!res.ok) throw new Error("Erro ao carregar feed");
       const data = await res.json();
       if (Array.isArray(data)) {
@@ -120,7 +120,7 @@ export default function SocialPage() {
         formData.append("file", selectedPhoto);
         formData.append("athlete_id", "00000000-0000-0000-0000-000000000000");
 
-        const uploadRes = await fetch("http://192.168.100.105:8081/upload", {
+        const uploadRes = await fetch("http://100.107.163.24:8081/upload", {
           method: "POST",
           body: formData,
         });
@@ -140,7 +140,7 @@ export default function SocialPage() {
         formData.append("file", selectedVideo);
         formData.append("athlete_id", "00000000-0000-0000-0000-000000000000");
 
-        const uploadRes = await fetch("http://192.168.100.105:8081/upload", {
+        const uploadRes = await fetch("http://100.107.163.24:8081/upload", {
           method: "POST",
           body: formData,
         });
@@ -155,7 +155,7 @@ export default function SocialPage() {
         video_url = uploadData.url;
       }
 
-      const res = await fetch("http://192.168.100.105:8081/social/posts", {
+      const res = await fetch("http://100.107.163.24:8081/social/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -189,7 +189,7 @@ export default function SocialPage() {
   const deletePost = async (postId: string) => {
     if (!confirm("Tem certeza que deseja excluir esta postagem?")) return;
     try {
-      const res = await fetch(`http://192.168.100.105:8081/social/posts/${postId}`, {
+      const res = await fetch(`http://100.107.163.24:8081/social/posts/${postId}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -246,7 +246,7 @@ export default function SocialPage() {
         const newStory: Story = {
           id: Date.now(),
           user: "Você",
-          video_url: `http://192.168.100.105:8081${post.video_url}`,
+          video_url: `http://100.107.163.24:8081${post.video_url}`,
           type: 'video',
         };
         setUserStories(prev => [newStory, ...prev]);
@@ -255,7 +255,7 @@ export default function SocialPage() {
         const newStory: Story = {
           id: Date.now(),
           user: "Você",
-          image: `http://192.168.100.105:8081${post.image_url}`,
+          image: `http://100.107.163.24:8081${post.image_url}`,
           type: 'image',
         };
         setUserStories(prev => [newStory, ...prev]);
@@ -266,7 +266,7 @@ export default function SocialPage() {
     } else {
       // RETESP 4L
       if (post.video_url) {
-        const videoUrl = `http://192.168.100.105:8081${post.video_url}`;
+        const videoUrl = `http://100.107.163.24:8081${post.video_url}`;
         const newStory: Story = {
           id: 1,
           user: 'RETESP 4L',
@@ -280,7 +280,7 @@ export default function SocialPage() {
         // Abrir o story automaticamente
         setTimeout(() => setSelectedStory(1), 300);
       } else if (post.image_url) {
-        const imageUrl = `http://192.168.100.105:8081${post.image_url}`;
+        const imageUrl = `http://100.107.163.24:8081${post.image_url}`;
         const newStory: Story = {
           id: 1,
           user: 'RETESP 4L',
@@ -644,7 +644,7 @@ export default function SocialPage() {
                 {post.image_url && (
                   <div className="w-full h-64 bg-[#0D1117] border border-[#21262D] rounded-lg mb-4 overflow-hidden relative">
                     <img 
-                      src={`http://192.168.100.105:8081${post.image_url}`} 
+                      src={`http://100.107.163.24:8081${post.image_url}`} 
                       alt="Imagem da postagem" 
                       className="w-full h-full object-cover"
                     />
@@ -654,7 +654,7 @@ export default function SocialPage() {
                 {post.video_url && (
                   <div className="w-full bg-[#0D1117] border border-[#21262D] rounded-lg mb-4 overflow-hidden relative">
                     <video 
-                      src={`http://192.168.100.105:8081${post.video_url}`} 
+                      src={`http://100.107.163.24:8081${post.video_url}`} 
                       className="w-full h-full object-cover max-h-[400px]"
                       controls
                       preload="metadata"

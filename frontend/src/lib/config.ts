@@ -1,15 +1,12 @@
-// Configuração da API com IP fixo
-const API_URL = "http://192.168.100.105:8081";
-const WS_URL = "ws://192.168.100.105:8081";
+// Configuração da API com IP do Tailscale
+const API_URL = "http://100.107.163.24:8081";
+const WS_URL = "ws://100.107.163.24:8081";
 
-// Exportações para compatibilidade
 export const API_BASE_URL = API_URL;
 export const API_BASE = API_URL;
 
-// Exportação padrão
 export { API_URL, WS_URL };
 
-// Endpoints
 export const ENDPOINTS = {
   athletes: `${API_URL}/athletes`,
   coaches: `${API_URL}/coaches`,

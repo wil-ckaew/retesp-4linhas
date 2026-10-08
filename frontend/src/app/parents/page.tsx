@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 type Athlete = {
   id: string;
@@ -25,6 +26,7 @@ type MediaItem = {
 };
 
 export default function ParentsPage() {
+  const router = useRouter();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(null);
   const [summary, setSummary] = useState<AthleteSummary | null>(null);
@@ -37,7 +39,7 @@ export default function ParentsPage() {
   const [newName, setNewName] = useState("");
 
   // Usar variável de ambiente para a URL da API
-  const API_URL = "http://192.168.100.105:8081";
+  const API_URL = "http://100.107.163.24:8081";
 
   // Carregar lista de atletas
   useEffect(() => {
@@ -186,6 +188,16 @@ export default function ParentsPage() {
             <option key={a.id} value={a.id}>{a.name}</option>
           ))}
         </select>
+
+        {/* Botão de Autorização de Imagem */}
+        {selectedAthleteId && (
+          <button
+            onClick={() => router.push(`/parents/consent/${selectedAthleteId}`)}
+            className="mt-4 w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-medium transition flex items-center justify-center gap-2"
+          >
+            📸 Assinar Autorização de Imagem
+          </button>
+        )}
       </div>
 
       {selectedAthleteId && (

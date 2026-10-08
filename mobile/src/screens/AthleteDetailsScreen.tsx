@@ -13,6 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
 import { API_URL } from '../services/api';
+import { getConsentByAthlete, ImageConsent } from '../services/consentApi';
 import { useTheme } from '../context/ThemeContext';
 import PDFViewer from '../components/PDFViewerExpo';
 import PhotoViewer from '../components/PhotoViewer';
@@ -48,6 +49,8 @@ export default function AthleteDetailsScreen() {
   const [selectedPdfName, setSelectedPdfName] = useState<string>('');
 
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [consent, setConsent] = useState<ImageConsent | null>(null);
+  const [consentLoading, setConsentLoading] = useState(false);
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
   const [selectedPhotoName, setSelectedPhotoName] = useState<string>('');
 
@@ -75,6 +78,13 @@ export default function AthleteDetailsScreen() {
 
     if (id) {
       fetchAthlete();
+    }
+  }, [id]);
+
+  // Buscar termo de imagem ao carregar
+  useEffect(() => {
+    if (id) {
+      fetchConsent();
     }
   }, [id]);
 
@@ -206,6 +216,25 @@ export default function AthleteDetailsScreen() {
   };
 
   // CORREÇÃO: Função para navegar para a tela de chamada
+  // Buscar termo de imagem
+  const fetchConsent = async () => {
+    if (!id) return;
+    try {
+      setConsentLoading(true);
+      const data = await getConsentByAthlete(id);
+      setConsent(data);
+    } catch (error) {
+      console.error('Erro ao buscar termo:', error);
+    } finally {
+      setConsentLoading(false);
+    }
+  };
+
+  // Abrir tela de assinatura
+  const goToConsent = () => {
+    navigation.navigate('Consent', { athlete });
+  };
+
   const goToAttendance = () => {
     // Tenta navegar para a tela de chamada
     // O nome da rota pode ser 'Attendance', 'AttendanceScreen' ou 'Chamada'
@@ -425,6 +454,50 @@ export default function AthleteDetailsScreen() {
             )}
           </TouchableOpacity>
           <Text style={styles.name}>{athlete.name}</Text>
+
+          {/* Status do Termo de Imagem */}
+          {consentLoading ? (
+            <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>
+              ⏳ Verificando termo...
+            </Text>
+          ) : consent?.status === 'active' ? (
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#10B98120',
+              borderWidth: 1,
+              borderColor: '#10B98140',
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 20,
+              marginTop: 6,
+              gap: 4,
+            }}>
+              <Text style={{ fontSize: 12 }}>✅</Text>
+              <Text style={{ color: '#10B981', fontSize: 11, fontWeight: 'bold' }}>
+                Imagem Autorizada
+              </Text>
+            </View>
+          ) : (
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#F59E0B20',
+              borderWidth: 1,
+              borderColor: '#F59E0B40',
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 20,
+              marginTop: 6,
+              gap: 4,
+            }}>
+              <Text style={{ fontSize: 12 }}>⚠️</Text>
+              <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: 'bold' }}>
+                Imagem Pendente
+              </Text>
+            </View>
+          )}
+
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
               <Text style={styles.emojiIcon}>🏷️</Text>
@@ -450,6 +523,43 @@ export default function AthleteDetailsScreen() {
               {attendanceLoading ? '⏳ Carregando...' : '📊 Verificar Presença'}
             </Text>
           </TouchableOpacity>
+
+          {/* Botão de Autorização de Imagem */}
+          <TouchableOpacity
+            onPress={goToConsent}
+            style={{
+              marginTop: 12,
+              backgroundColor: consent?.status === 'active' ? '#10B981' : '#F59E0B',
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderRadius: 8,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <Text style={{ fontSize: 18 }}>
+              {consent?.status === 'active' ? '✅' : '📸'}
+            </Text>
+            <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>
+              {consent?.status === 'active'
+                ? 'Autorização de Imagem Assinada'
+                : 'Assinar Autorização de Imagem'}
+            </Text>
+          </TouchableOpacity>
+
+          {consent?.status === 'active' && (
+            <Text style={{ color: colors.textSecondary, fontSize: 11, textAlign: 'center', marginTop: 6 }}>
+              Assinado em {new Date(consent.signed_at).toLocaleDateString('pt-BR')}
+            </Text>
+          )}
+
+          {consentLoading && (
+            <Text style={{ color: colors.textSecondary, fontSize: 11, textAlign: 'center', marginTop: 6 }}>
+              ⏳ Verificando termo...
+            </Text>
+          )}
         </View>
 
         {/* Informações detalhadas */}

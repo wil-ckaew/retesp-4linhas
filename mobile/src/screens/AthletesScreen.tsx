@@ -21,6 +21,7 @@ import { API_URL } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import PDFViewer from '../components/PDFViewerExpo';
 import PhotoViewer from '../components/PhotoViewer';
+import { getConsentByAthlete, ImageConsent } from '../services/consentApi';
 
 interface Athlete {
   id: string;
@@ -71,6 +72,9 @@ export default function AthletesScreen() {
 
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
+  const [consent, setConsent] = useState<ImageConsent | null>(null);
+  const [consentsMap, setConsentsMap] = useState<Record<string, ImageConsent | null>>({});
+  const [consentLoading, setConsentLoading] = useState(false);
   const [selectedPhotoName, setSelectedPhotoName] = useState<string>('');
 
   const categories = ['all', 'Sub-10', 'Sub-12', 'Sub-14', 'Sub-16', 'Sub-18', 'Sub-20'];
@@ -619,6 +623,22 @@ export default function AthletesScreen() {
     },
   });
 
+  const fetchAllConsents = async (athletesList: Athlete[]) => {
+    const consents: Record<string, ImageConsent | null> = {};
+    await Promise.all(
+      athletesList.map(async (athlete) => {
+        try {
+          const consentData = await getConsentByAthlete(athlete.id);
+          consents[athlete.id] = consentData;
+        } catch (error) {
+          consents[athlete.id] = null;
+        }
+      })
+    );
+    setConsentsMap(consents);
+    console.log('📸 Termos assinados:', Object.values(consents).filter(c => c).length);
+  };
+
   const fetchAthletes = async () => {
     try {
       const res = await fetch(`${API_URL}/athletes?_t=${Date.now()}`);
@@ -628,6 +648,9 @@ export default function AthletesScreen() {
       setAthletes(data);
       setFilteredAthletes(data);
       setImageErrors({});
+      fetchAllConsents(data);
+      // Buscar termos de todos os atletas
+      fetchAllConsents(data);
     } catch (error) {
       console.error('Erro ao buscar atletas:', error);
     } finally {
@@ -672,7 +695,8 @@ export default function AthletesScreen() {
     setSelectedAthlete(athlete);
     setModalVisible(true);
     fetchAttendanceHistory(athlete.id);
-  };
+      fetchConsent(athlete.id);
+};
 
   const closeDetails = () => {
     setModalVisible(false);
@@ -698,6 +722,25 @@ export default function AthletesScreen() {
     } finally {
       setLoadingHistory(false);
     }
+  };
+
+  // Buscar termo de imagem
+  const fetchConsent = async (athleteId: string) => {
+    try {
+      setConsentLoading(true);
+      const data = await getConsentByAthlete(athleteId);
+      setConsent(data);
+    } catch (error) {
+      console.error('Erro ao buscar termo:', error);
+    } finally {
+      setConsentLoading(false);
+    }
+  };
+
+  // Abrir tela de assinatura
+  const goToConsent = (athlete: any) => {
+    closeDetails();
+    navigation.navigate('Consent', { athlete });
   };
 
   const navigateToEdit = (id: string) => {
@@ -947,6 +990,47 @@ export default function AthletesScreen() {
           <View style={styles.athleteInfo}>
             <Text style={styles.athleteName}>{item.name}</Text>
             <Text style={styles.athleteCategory}>{item.category}</Text>
+            
+            {/* Status do Termo de Imagem */}
+            {consentsMap[item.id] ? (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#10B98120',
+                borderWidth: 1,
+                borderColor: '#10B98140',
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 12,
+                marginTop: 4,
+                alignSelf: 'flex-start',
+                gap: 3,
+              }}>
+                <Text style={{ fontSize: 10 }}>✅</Text>
+                <Text style={{ color: '#10B981', fontSize: 10, fontWeight: 'bold' }}>
+                  Imagem Autorizada
+                </Text>
+              </View>
+            ) : (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#F59E0B20',
+                borderWidth: 1,
+                borderColor: '#F59E0B40',
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 12,
+                marginTop: 4,
+                alignSelf: 'flex-start',
+                gap: 3,
+              }}>
+                <Text style={{ fontSize: 10 }}>⚠️</Text>
+                <Text style={{ color: '#F59E0B', fontSize: 10, fontWeight: 'bold' }}>
+                  Imagem Pendente
+                </Text>
+              </View>
+            )}
           </View>
           <Text style={{ fontSize: 22 }}>
             {isExpanded ? '🔽' : '▶️'}
@@ -1272,6 +1356,45 @@ export default function AthletesScreen() {
 
                 {/* Histórico de Presenças */}
                 {renderAttendanceHistory()}
+
+                {/* Botão de Autorização de Imagem */}
+                <TouchableOpacity
+                  onPress={() => goToConsent(selectedAthlete)}
+                  style={{
+                    marginHorizontal: 16,
+                    marginBottom: 12,
+                    marginTop: 16,
+                    backgroundColor: consent?.status === 'active' ? '#10B981' : '#F59E0B',
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: 20 }}>
+                    {consent?.status === 'active' ? '✅' : '📸'}
+                  </Text>
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
+                    {consent?.status === 'active'
+                      ? 'Autorização de Imagem Assinada'
+                      : 'Assinar Autorização de Imagem'}
+                  </Text>
+                </TouchableOpacity>
+
+                {consent?.status === 'active' && (
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', marginBottom: 12 }}>
+                    ✅ Assinado em {new Date(consent.signed_at).toLocaleDateString('pt-BR')}
+                  </Text>
+                )}
+
+                {consentLoading && (
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', marginBottom: 12 }}>
+                    ⏳ Verificando termo...
+                  </Text>
+                )}
 
                 {/* Botões de Ação */}
                 <View style={styles.modalActions}>

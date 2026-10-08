@@ -58,7 +58,7 @@ export default function RankingPage() {
   const [totalAchievements, setTotalAchievements] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const API_URL = "http://192.168.100.105:8081";
+  const API_URL = "http://100.107.163.24:8081";
 
   console.log('🔧 API_URL:', API_URL);
 

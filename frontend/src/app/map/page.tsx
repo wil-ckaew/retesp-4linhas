@@ -7,7 +7,7 @@ export default function MapPage() {
   const [mapHtml, setMapHtml] = useState("");
 
   useEffect(() => {
-    fetch("http://192.168.100.105:8081/nuclei")
+    fetch("http://100.107.163.24:8081/nuclei")
       .then(res => res.json())
       .then(data => setNuclei(data));
   }, []);
